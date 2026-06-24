@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" preserveAspectRatio="xMidYMid meet">
+  <!-- ============================================================
+       Durata "AI:20" GPU Hall — facade sprite (self-contained SVG).
+       Renders inside a GPU Hall module (4x3 cell footprint).
+       Swap with gpu-hall.png to use a raster sprite instead.
+       ============================================================ -->
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b6fb0"/>
+      <stop offset="1" stop-color="#133a63"/>
+    </linearGradient>
+    <radialGradient id="logoBlue" cx="40%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#69b6f0"/>
+      <stop offset="1" stop-color="#1f6fc0"/>
+    </radialGradient>
+    <g id="dotlogo">
+      <circle r="30" fill="url(#logoBlue)"/>
+      <g fill="#dff0ff" opacity=".92">
+        <circle cx="0"   cy="-1"  r="4"/>
+        <circle cx="-12" cy="-9"  r="3"/><circle cx="12" cy="-9"  r="3"/>
+        <circle cx="-15" cy="6"   r="3"/><circle cx="15" cy="6"   r="3"/>
+        <circle cx="-6"  cy="12"  r="3"/><circle cx="6"  cy="12"  r="3"/>
+        <circle cx="0"   cy="-15" r="2.6"/><circle cx="-9" cy="3" r="2.4"/>
+        <circle cx="9"   cy="3"   r="2.4"/><circle cx="0" cy="7" r="2.4"/>
+      </g>
+    </g>
+  </defs>
+
+  <!-- lower side wings -->
+  <rect x="0" y="170" width="480" height="165" fill="#ffffff" stroke="#cfd5da" stroke-width="2"/>
+  <!-- central raised block -->
+  <rect x="95" y="70" width="290" height="265" fill="#ffffff" stroke="#cfd5da" stroke-width="2"/>
+
+  <!-- side-wing blue stripes -->
+  <g fill="#1f5fa6">
+    <rect x="8"   y="150" width="78" height="7" rx="3.5"/>
+    <rect x="8"   y="164" width="78" height="7" rx="3.5"/>
+    <rect x="8"   y="178" width="78" height="7" rx="3.5"/>
+    <rect x="394" y="150" width="78" height="7" rx="3.5"/>
+    <rect x="394" y="164" width="78" height="7" rx="3.5"/>
+    <rect x="394" y="178" width="78" height="7" rx="3.5"/>
+  </g>
+
+  <!-- upper facade: stripe groups flanking the logo -->
+  <g fill="#1f5fa6">
+    <rect x="110" y="92"  width="92" height="7" rx="3.5"/>
+    <rect x="110" y="106" width="92" height="7" rx="3.5"/>
+    <rect x="110" y="120" width="92" height="7" rx="3.5"/>
+    <rect x="110" y="134" width="92" height="7" rx="3.5"/>
+    <rect x="278" y="92"  width="92" height="7" rx="3.5"/>
+    <rect x="278" y="106" width="92" height="7" rx="3.5"/>
+    <rect x="278" y="120" width="92" height="7" rx="3.5"/>
+    <rect x="278" y="134" width="92" height="7" rx="3.5"/>
+  </g>
+
+  <!-- circular dotted logo + AI:20 -->
+  <use href="#dotlogo" x="240" y="112"/>
+  <text x="240" y="172" text-anchor="middle" font-family="Inter, Arial, sans-serif"
+        font-weight="700" font-size="30" fill="#1f5fa6" letter-spacing="1">AI:20</text>
+
+  <!-- glass storefront -->
+  <rect x="112" y="192" width="256" height="120" fill="url(#glass)"/>
+  <g stroke="#9fc4e6" stroke-width="1.4" opacity=".55">
+    <line x1="138" y1="192" x2="138" y2="312"/><line x1="164" y1="192" x2="164" y2="312"/>
+    <line x1="190" y1="192" x2="190" y2="312"/><line x1="216" y1="192" x2="216" y2="312"/>
+    <line x1="264" y1="192" x2="264" y2="312"/><line x1="290" y1="192" x2="290" y2="312"/>
+    <line x1="316" y1="192" x2="316" y2="312"/><line x1="342" y1="192" x2="342" y2="312"/>
+    <line x1="112" y1="226" x2="368" y2="226"/>
+  </g>
+  <!-- reflection sheen -->
+  <polygon points="120,192 175,192 130,312 112,312" fill="#ffffff" opacity=".06"/>
+
+  <!-- Durata wordmark on the glass -->
+  <g transform="translate(150,218) scale(0.42)"><use href="#dotlogo"/></g>
+  <text x="168" y="226" font-family="Inter, Arial, sans-serif" font-weight="700"
+        font-size="22" fill="#ffffff">Durata</text>
+
+  <!-- entrance doors -->
+  <rect x="218" y="214" width="44" height="98" fill="#173f68" stroke="#9fc4e6" stroke-width="1.2"/>
+  <line x1="240" y1="214" x2="240" y2="312" stroke="#9fc4e6" stroke-width="1.2"/>
+  <rect x="232" y="250" width="3" height="26" fill="#cfe2f4"/>
+  <rect x="245" y="250" width="3" height="26" fill="#cfe2f4"/>
+
+  <!-- hedges flanking the entrance -->
+  <g>
+    <rect x="78"  y="300" width="74" height="26" rx="12" fill="#5a9e3f"/>
+    <rect x="78"  y="300" width="74" height="10" rx="6"  fill="#6fb44e" opacity=".7"/>
+    <rect x="328" y="300" width="74" height="26" rx="12" fill="#5a9e3f"/>
+    <rect x="328" y="300" width="74" height="10" rx="6"  fill="#6fb44e" opacity=".7"/>
+  </g>
+
+  <!-- side service doors -->
+  <rect x="16"  y="250" width="26" height="74" fill="#eef1f3" stroke="#c2c9cf"/>
+  <rect x="438" y="250" width="26" height="74" fill="#eef1f3" stroke="#c2c9cf"/>
+
+  <!-- base plinth -->
+  <rect x="0" y="326" width="480" height="34" fill="#c9ced3"/>
+  <rect x="0" y="326" width="480" height="5"  fill="#b4bbc1"/>
+</svg>
