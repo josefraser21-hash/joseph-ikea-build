@@ -566,20 +566,24 @@
 /* ================================================================
    CONFIG
    ================================================================ */
-const GRID = 32;          // grid is 32 x 32 cells
 const UNIT_H = 2;         // every Powercore is 2 cells tall
 const STAGE_W = 1280, STAGE_H = 720;   // fixed render-frame dimensions
 
+// Grid geometry is derived per size (in buildGrid) so the grid fills the whole
+// 1280x720 frame and an exact number of units tiles across each row.
+let COLS = 32, ROWS = 18, CELL = 40;
+
 // Per-size definition.
 //  w    = width in grid cells
-//  cell = px size of a grid cell (the "zoom illusion": bigger module -> bigger cells/units)
+//  cols = grid columns for this size — MUST be a multiple of w so a whole
+//         number of units tiles across the full-width grid
 //  stats are per single unit, stored in kW (power) and metres (footprint length)
 const SIZES = {
-  '1':   { label:'1MW',   w:2, cell:17,
+  '1':   { label:'1MW',   w:2, cols:32,
            capacity:1000, power:833,  mech:167, ups:500,  flen:6.7 },
-  '2.4': { label:'2.4MW', w:4, cell:21,
+  '2.4': { label:'2.4MW', w:4, cols:32,
            capacity:2400, power:2000, mech:400, ups:1200, flen:16  },
-  '5':   { label:'5MW',   w:6, cell:25,
+  '5':   { label:'5MW',   w:6, cols:36,
            capacity:5000, power:4170, mech:833, ups:2500, flen:33  },
 };
 
@@ -759,8 +763,8 @@ function clearAllUnits() {
 // Place a single, centred, swappable default unit of the current size.
 function placeDefaultUnit() {
   const w = SIZES[selectedSize].w;
-  const col = Math.round((GRID - w) / 2);      // centred horizontally (2.4MW -> col 14)
-  const row = GRID - UNIT_H;                    // bottom row — sits on the floor
+  const col = Math.round((COLS - w) / 2);       // centred horizontally
+  const row = ROWS - UNIT_H;                     // bottom row — sits on the floor
   placeUnit(col, row, true);
 }
 
@@ -775,18 +779,20 @@ function updatePickerLock() {
 /* ================================================================
    GRID
    ================================================================ */
-// Single fixed cell size so the whole 32x32 grid fits inside the 720px frame.
-const CELL = Math.floor((STAGE_H - 48) / GRID);   // -> 21px, grid = 672px
 function cell() { return CELL; }
 
 function buildGrid() {
-  const c = cell();
-  const px = GRID * c;
-  gridEl.style.width  = px + 'px';
-  gridEl.style.height = px + 'px';
-  gridEl.style.left   = Math.round((STAGE_W - px) / 2) + 'px';  // centred horizontally
-  gridEl.style.top    = (STAGE_H - px - 16) + 'px';             // rests on the floor
-  gridEl.style.backgroundSize = c + 'px ' + c + 'px';
+  const cfg = SIZES[selectedSize];
+  COLS = cfg.cols;                    // multiple of the unit width
+  CELL = STAGE_W / COLS;              // fill the full 1280 width exactly
+  ROWS = Math.round(STAGE_H / CELL);  // rows to cover the full height
+  if (ROWS % 2) ROWS++;              // keep even — units are 2 cells tall
+  const h = ROWS * CELL;
+  gridEl.style.width  = STAGE_W + 'px';
+  gridEl.style.height = h + 'px';
+  gridEl.style.left   = '0px';
+  gridEl.style.top    = (STAGE_H - h) + 'px';   // bottom-aligned: units sit on the floor
+  gridEl.style.backgroundSize = CELL + 'px ' + CELL + 'px';
 }
 
 // Find the unit occupying a given cell, if any.
@@ -797,7 +803,7 @@ function unitAt(col, row) {
 
 // Does a w×h footprint at (col,row) overlap anything / fall off-grid?
 function overlaps(col, row, w, h) {
-  if (col < 0 || row < 0 || col + w > GRID || row + h > GRID) return true;
+  if (col < 0 || row < 0 || col + w > COLS || row + h > ROWS) return true;
   for (let r = row; r < row + h; r++)
     for (let cc = col; cc < col + w; cc++)
       if (occupied[r + ',' + cc] != null) return true;
@@ -853,8 +859,8 @@ gridEl.addEventListener('mousemove', e => {
   let col = Math.floor((e.clientX - rect.left) / c);
   let row = Math.floor((e.clientY - rect.top)  / c);
   const w = SIZES[selectedSize].w, h = UNIT_H;
-  col = Math.min(Math.max(col, 0), GRID - w);
-  row = Math.min(Math.max(row, 0), GRID - h);
+  col = Math.min(Math.max(col, 0), COLS - w);
+  row = Math.min(Math.max(row, 0), ROWS - h);
 
   ghostEl.style.display = 'block';
   ghostEl.style.left   = (gridEl.offsetLeft + col * c) + 'px';
@@ -871,8 +877,8 @@ gridEl.addEventListener('mouseleave', () => { ghostEl.style.display = 'none'; })
 function tryPlace(col, row) {
   const w = SIZES[selectedSize].w, h = UNIT_H;
   // clamp anchor so the footprint always fits inside the grid
-  col = Math.min(Math.max(col, 0), GRID - w);
-  row = Math.min(Math.max(row, 0), GRID - h);
+  col = Math.min(Math.max(col, 0), COLS - w);
+  row = Math.min(Math.max(row, 0), ROWS - h);
   if (overlaps(col, row, w, h)) return;            // occupied -> ignore
   // from the second placement on, new units must connect to an existing one
   if (units.length >= 1 && !isAdjacent(col, row, w, h)) { showAdjToast(); return; }
