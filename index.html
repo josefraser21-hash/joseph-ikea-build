@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Durata · Powercore Configurator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     DURATA POWERCORE CONFIGURATOR — portfolio mockup
+     Single self-contained file. Vanilla JS. No frameworks.
+     ============================================================ */
+
+  :root {
+    --navy:      #0B1420;   /* page background (deep navy)        */
+    --navy-2:    #0F1C2B;   /* panels / cards                    */
+    --navy-3:    #142536;   /* raised panels / hovers            */
+    --void:      #081019;   /* canvas void                       */
+    --cyan:      #00C8FF;   /* primary accent                    */
+    --cyan-dim:  #0a3f52;   /* muted cyan for borders            */
+    --white:     #ffffff;
+    --grey:      #8aa0b4;   /* secondary text                    */
+    --line:      rgba(255,255,255,.06);
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--navy);
+    color: var(--white);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* App is a vertical stack: nav / workspace / bottom bar.
+     A minimum width keeps the three-column layout intact (responsive to 1280px). */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-width: 1280px;
+    overflow-x: auto;
+  }
+
+  /* ---------------------------------------------------------- NAV BAR */
+  .nav {
+    flex: 0 0 auto;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    background: var(--navy);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav__brand { display: flex; align-items: center; gap: 12px; }
+  .nav__brand svg { display: block; width: 34px; height: 34px; }
+  .nav__wordmark {
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: 4px;
+    color: var(--white);
+  }
+  .nav__links { display: flex; gap: 30px; }
+  .nav__links a {
+    color: var(--grey);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: .3px;
+    transition: color .2s ease;
+  }
+  .nav__links a:hover { color: var(--cyan); }
+
+  /* ---------------------------------------------------------- WORKSPACE (3 cols) */
+  .workspace {
+    flex: 1 1 auto;
+    display: flex;
+    min-height: 0;
+  }
+
+  /* ----- LEFT SIDEBAR — module size picker (200px) */
+  .sidebar-left {
+    flex: 0 0 200px;
+    background: var(--navy);
+    border-right: 1px solid var(--line);
+    padding: 22px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .picker-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--grey);
+    font-weight: 600;
+  }
+  .size-opt {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 12px;
+    background: var(--navy-2);
+    border: 1.5px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color .18s ease, background .18s ease, opacity .18s ease;
+  }
+  .size-opt:hover { background: var(--navy-3); }
+  .size-opt.selected {
+    border-color: var(--cyan);
+    background: rgba(0,200,255,.07);
+    box-shadow: 0 0 0 1px var(--cyan) inset, 0 6px 18px rgba(0,200,255,.12);
+  }
+  .size-opt.locked {
+    opacity: .32;
+    pointer-events: none;
+    filter: grayscale(.5);
+  }
+  .size-opt__label { font-size: 16px; font-weight: 700; color: var(--white); }
+  .size-opt__sub   { font-size: 11px; color: var(--grey); margin-top: 1px; }
+
+  /* mini unit thumbnail in the picker */
+  .thumb {
+    flex: 0 0 auto;
+    height: 24px;
+    border-radius: 3px;
+    background: linear-gradient(180deg,#eef2f6 0%, #cdd5de 55%, #aeb8c2 100%);
+    border: 1.5px solid #2a3340;
+    border-bottom: 3px solid var(--cyan);
+    position: relative;
+    overflow: hidden;
+  }
+  .thumb::before {
+    content: "";
+    position: absolute; inset: 0 0 auto 0; height: 7px;
+    background: linear-gradient(180deg,#3a4754,#27313c);
+  }
+  .picker-caption {
+    margin-top: auto;
+    font-size: 12px;
+    color: var(--grey);
+    line-height: 1.4;
+    padding-top: 16px;
+  }
+
+  /* ----- CENTRE — grid canvas */
+  .canvas-wrap {
+    flex: 1 1 auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    background:
+      radial-gradient(ellipse at 50% 38%, #0d1c2c 0%, var(--void) 70%);
+  }
+  #grid {
+    position: relative;
+    /* faint guide lines — nearly invisible */
+    background-color: transparent;
+    background-image:
+      linear-gradient(rgba(120,180,220,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120,180,220,.045) 1px, transparent 1px);
+    box-shadow: 0 30px 80px rgba(0,0,0,.5);
+    cursor: pointer;
+  }
+
+  /* placement ghost preview */
+  .ghost {
+    position: absolute;
+    pointer-events: none;
+    border: 1.5px dashed rgba(0,200,255,.6);
+    background: rgba(0,200,255,.06);
+    border-radius: 3px;
+    display: none;
+    z-index: 5;
+  }
+  .ghost.blocked {
+    border-color: rgba(255,90,90,.7);
+    background: rgba(255,90,90,.08);
+  }
+
+  /* ----- THE POWERCORE UNIT (flat 3D-style illustration) */
+  .unit {
+    position: absolute;
+    border-radius: 3px;
+    z-index: 10;
+    overflow: hidden;
+    border: 1.5px solid #232c38;
+    box-shadow:
+      0 10px 22px rgba(0,0,0,.55),
+      inset 0 1px 0 rgba(255,255,255,.35);
+    cursor: pointer;
+  }
+  /* dark steel roof / top frame with cooling vents */
+  .unit__roof {
+    height: 26%;
+    background:
+      repeating-linear-gradient(90deg,
+        rgba(255,255,255,.05) 0, rgba(255,255,255,.05) 2px,
+        transparent 2px, transparent 6px),
+      linear-gradient(180deg,#3b4856 0%, #28323e 100%);
+    border-bottom: 1px solid #1b232d;
+  }
+  /* light panelled body with vertical seams */
+  .unit__body {
+    height: 66%;
+    position: relative;
+    background:
+      linear-gradient(180deg,#f1f4f7 0%, #d2d9e1 55%, #b0bac4 100%);
+  }
+  .unit__body::after {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(90deg,
+      transparent 0, transparent calc(var(--seam) - 1px),
+      rgba(40,52,64,.30) calc(var(--seam) - 1px), rgba(40,52,64,.30) var(--seam));
+  }
+  /* glowing cyan accent line along the base */
+  .unit__base {
+    height: 8%;
+    min-height: 3px;
+    background: var(--cyan);
+    box-shadow: 0 0 10px rgba(0,200,255,.8), 0 0 2px rgba(0,200,255,1);
+  }
+  /* dark corner posts (steel frame uprights) */
+  .unit::before, .unit::after {
+    content: "";
+    position: absolute; top: 0; bottom: 0; width: 4px;
+    background: linear-gradient(180deg,#3b4856,#1c242e);
+    z-index: 2;
+  }
+  .unit::before { left: 0; }
+  .unit::after  { right: 0; }
+
+  /* drop-in animation: fall from above + settle with a bounce */
+  @keyframes drop {
+    0%   { transform: translateY(-70px); opacity: 0; }
+    55%  { transform: translateY(0);     opacity: 1; }
+    70%  { transform: translateY(-12px); }
+    84%  { transform: translateY(0); }
+    92%  { transform: translateY(-4px); }
+    100% { transform: translateY(0); }
+  }
+  .unit.dropping { animation: drop .6s cubic-bezier(.3,.7,.4,1) both; }
+
+  /* dust particle */
+  .particle {
+    position: absolute;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9;
+  }
+
+  /* soft-gate nudge banner */
+  .nudge {
+    position: absolute;
+    top: 18px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,90,90,.12);
+    border: 1px solid rgba(255,120,120,.5);
+    color: #ffd0d0;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    display: none;
+    z-index: 30;
+    backdrop-filter: blur(4px);
+  }
+
+  /* ----- RIGHT SIDEBAR — live stats (240px) */
+  .sidebar-right {
+    flex: 0 0 240px;
+    background: var(--navy);
+    border-left: 1px solid var(--line);
+    padding: 22px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+  .stats-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--grey);
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  /* Durata-style card: cyan label above white value */
+  .stat-card {
+    background: var(--navy-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--cyan);
+    font-weight: 600;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+  }
+  .stat-card .value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--white);
+    margin-top: 3px;
+    line-height: 1.1;
+  }
+  .stat-card.is-bumped { animation: bump .4s ease; }
+  @keyframes bump {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.04); border-color: rgba(0,200,255,.5); }
+    100% { transform: scale(1); }
+  }
+  .cta {
+    margin-top: 6px;
+    width: 100%;
+    padding: 13px;
+    background: var(--cyan);
+    color: #04222e;
+    border: none;
+    border-radius: 9px;
+    font-family: var(--font);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: .3px;
+    cursor: pointer;
+    transition: filter .15s ease, transform .05s ease;
+    box-shadow: 0 8px 20px rgba(0,200,255,.22);
+  }
+  .cta:hover { filter: brightness(1.08); }
+  .cta:active { transform: translateY(1px); }
+
+  /* ---------------------------------------------------------- BOTTOM BAR */
+  .bottombar {
+    flex: 0 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    background: var(--navy);
+    border-top: 1px solid var(--line);
+  }
+  .bottombar__count { font-size: 14px; color: var(--white); font-weight: 600; }
+  .bottombar__count span { color: var(--cyan); }
+  .btn-outline {
+    padding: 10px 20px;
+    background: transparent;
+    color: var(--cyan);
+    border: 1.5px solid var(--cyan);
+    border-radius: 8px;
+    font-family: var(--font);
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    transition: background .15s ease, color .15s ease;
+  }
+  .btn-outline:hover { background: var(--cyan); color: #04222e; }
+
+  /* ---------------------------------------------------------- LEAD MODAL */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(4,9,15,.72);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    width: 440px;
+    max-width: calc(100vw - 40px);
+    background: var(--navy-2);
+    border: 1px solid rgba(0,200,255,.2);
+    border-radius: 16px;
+    padding: 32px 30px 28px;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,.6);
+    animation: modalIn .25s ease;
+  }
+  @keyframes modalIn { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .modal__x {
+    position: absolute; top: 16px; right: 18px;
+    width: 28px; height: 28px;
+    background: transparent; border: none;
+    color: var(--grey); font-size: 22px; line-height: 1;
+    cursor: pointer; border-radius: 6px;
+  }
+  .modal__x:hover { color: var(--white); background: var(--navy-3); }
+  .modal h2 { font-size: 22px; font-weight: 700; }
+  .modal p.sub { color: var(--grey); font-size: 13px; margin-top: 8px; line-height: 1.5; }
+  .field { margin-top: 14px; }
+  .field-row { display: flex; gap: 12px; }
+  .field-row .field { flex: 1; }
+  .field label {
+    display: block; font-size: 11px; color: var(--grey);
+    text-transform: uppercase; letter-spacing: .6px; margin-bottom: 5px; font-weight: 600;
+  }
+  .field input {
+    width: 100%;
+    padding: 11px 12px;
+    background: var(--navy);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 14px;
+    transition: border-color .15s ease;
+  }
+  .field input:focus { outline: none; border-color: var(--cyan); }
+  .field input.invalid { border-color: #ff6a6a; }
+  .modal .cta { margin-top: 20px; }
+  .modal .fineprint { font-size: 12px; color: var(--grey); text-align: center; margin-top: 12px; }
+  .modal .success { text-align: center; padding: 14px 0 4px; }
+  .modal .success .tick {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: rgba(0,200,255,.12); border: 2px solid var(--cyan);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--cyan); font-size: 28px; margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== NAV BAR ===================== -->
+  <nav class="nav">
+    <div class="nav__brand">
+      <span id="logo" aria-label="Durata"></span>
+      <span class="nav__wordmark">DURATA</span>
+    </div>
+    <div class="nav__links">
+      <a href="#">Products</a>
+      <a href="#">Solutions</a>
+      <a href="#">Contact</a>
+    </div>
+  </nav>
+
+  <!-- ===================== WORKSPACE ===================== -->
+  <div class="workspace">
+
+    <!-- LEFT: size picker -->
+    <aside class="sidebar-left">
+      <div class="picker-title">Module Size</div>
+      <div id="picker"></div>
+      <div class="picker-caption">Select your Powercore capacity</div>
+    </aside>
+
+    <!-- CENTRE: canvas -->
+    <div class="canvas-wrap" id="canvasWrap">
+      <div id="grid"></div>
+      <div class="ghost" id="ghost"></div>
+      <div class="nudge" id="nudge">Enter your details to keep building</div>
+    </div>
+
+    <!-- RIGHT: live stats -->
+    <aside class="sidebar-right">
+      <div class="stats-title">Live Configuration</div>
+      <div id="stats"></div>
+      <button class="cta" id="saveBtn">Save / Email Design</button>
+    </aside>
+
+  </div>
+
+  <!-- ===================== BOTTOM BAR ===================== -->
+  <footer class="bottombar">
+    <div class="bottombar__count" id="bottomCount">0 &times; 2.4MW Powercores configured</div>
+    <a class="btn-outline" href="#">Request a consultation</a>
+  </footer>
+
+</div>
+
+<!-- ===================== LEAD CAPTURE MODAL ===================== -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <button class="modal__x" id="modalX" aria-label="Close">&times;</button>
+    <div id="modalForm">
+      <h2>Save or share your design</h2>
+      <p class="sub">Enter your details and we'll email you a summary of your configuration &mdash; and connect you with a Durata specialist.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>First name</label>
+          <input type="text" id="f_first" autocomplete="given-name" />
+        </div>
+        <div class="field">
+          <label>Last name</label>
+          <input type="text" id="f_last" autocomplete="family-name" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Work email</label>
+        <input type="email" id="f_email" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>Company</label>
+        <input type="text" id="f_company" autocomplete="organization" />
+      </div>
+      <button class="cta" id="submitBtn">Email my design</button>
+      <div class="fineprint">We'll be in touch within 2 working days.</div>
+    </div>
+    <div id="modalSuccess" style="display:none">
+      <div class="success">
+        <div class="tick">&#10003;</div>
+        <h2>Design on its way</h2>
+        <p class="sub">A summary of your configuration is headed to your inbox. Keep building &mdash; the canvas is all yours.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const GRID = 32;          // grid is 32 x 32 cells
+const UNIT_H = 2;         // every Powercore is 2 cells tall
+
+// Per-size definition.
+//  w    = width in grid cells
+//  cell = px size of a grid cell (the "zoom illusion": bigger module -> bigger cells/units)
+//  stats are per single unit, stored in kW (power) and metres (footprint length)
+const SIZES = {
+  '1':   { label:'1MW',   w:2, cell:17,
+           capacity:1000, power:833,  mech:167, ups:500,  flen:6.7 },
+  '2.4': { label:'2.4MW', w:4, cell:21,
+           capacity:2400, power:2000, mech:400, ups:1200, flen:16  },
+  '5':   { label:'5MW',   w:6, cell:25,
+           capacity:5000, power:4170, mech:833, ups:2500, flen:33  },
+};
+
+// The stat cards (top to bottom). Each pulls a per-unit field from SIZES.
+const STAT_DEFS = [
+  { key:'capacity', label:'Total Capacity',       fmt:fmtPower },
+  { key:'power',    label:'Power Infrastructure',  fmt:fmtPower },
+  { key:'mech',     label:'Mechanical Power',      fmt:fmtPower },
+  { key:'ups',      label:'UPS Capacity',          fmt:fmtPower },
+  { key:'flen',     label:'Footprint',             fmt:fmtFootprint },
+  { key:'units',    label:'Units Placed',          fmt:v => String(Math.round(v)) },
+];
+
+/* ================================================================
+   STATE
+   ================================================================ */
+let selectedSize = '2.4';     // default selection
+let units = [];               // { id, col, row, w, h, size, el }
+let occupied = {};            // "r,c" -> unit id
+let unitId = 0;
+let leadCaptured = false;     // has the lead form been submitted?
+let gateShown = false;        // has the 4-unit gate modal been auto-shown?
+
+/* ================================================================
+   DOM
+   ================================================================ */
+const gridEl    = document.getElementById('grid');
+const ghostEl   = document.getElementById('ghost');
+const nudgeEl   = document.getElementById('nudge');
+const pickerEl  = document.getElementById('picker');
+const statsEl   = document.getElementById('stats');
+const bottomEl  = document.getElementById('bottomCount');
+const overlay   = document.getElementById('overlay');
+
+/* ================================================================
+   DURATA LOGO — recreated as inline SVG (13-fold circle rosette)
+   Self-contained, crisp at any size, matches the brand mark.
+   ================================================================ */
+function buildLogo() {
+  const N = 13, C = 100, r = 47;   // 13 circles, each passing through centre
+  let circles = '';
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const cx = (C + r * Math.cos(a)).toFixed(2);
+    const cy = (C + r * Math.sin(a)).toFixed(2);
+    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" />`;
+  }
+  document.getElementById('logo').innerHTML =
+    `<svg viewBox="0 0 200 200" fill="none">
+       <defs>
+         <linearGradient id="durGrad" x1="0" y1="0" x2="0" y2="1">
+           <stop offset="0"   stop-color="#5DC0EE"/>
+           <stop offset="1"   stop-color="#1A5A93"/>
+         </linearGradient>
+       </defs>
+       <g stroke="url(#durGrad)" stroke-width="2.4" opacity="0.95">${circles}</g>
+     </svg>`;
+}
+
+/* ================================================================
+   FORMATTERS
+   ================================================================ */
+function trim(n) {                       // up to 2 decimals, strip trailing zeros
+  return parseFloat(n.toFixed(2)).toString();
+}
+function fmtPower(kw) {                   // kW -> "x kW" or "x MW"
+  if (kw >= 1000) return trim(kw / 1000) + ' MW';
+  return Math.round(kw) + ' kW';
+}
+function fmtFootprint(len) {              // total length -> "L×4×4m"
+  if (len <= 0) return '—';
+  return trim(len) + '×4×4m';
+}
+
+/* ================================================================
+   SIZE PICKER
+   ================================================================ */
+function buildPicker() {
+  pickerEl.innerHTML = '';
+  Object.keys(SIZES).forEach(key => {
+    const s = SIZES[key];
+    const opt = document.createElement('div');
+    opt.className = 'size-opt' + (key === selectedSize ? ' selected' : '');
+    opt.dataset.size = key;
+    // thumbnail width scales with module size for a quick visual cue
+    const tw = 24 + (s.w - 2) * 7;
+    opt.innerHTML =
+      `<div class="thumb" style="width:${tw}px"></div>
+       <div>
+         <div class="size-opt__label">${s.label}</div>
+         <div class="size-opt__sub">Powercore</div>
+       </div>`;
+    opt.addEventListener('click', () => selectSize(key));
+    pickerEl.appendChild(opt);
+  });
+  updatePickerLock();
+}
+
+function selectSize(key) {
+  if (units.length > 0) return;          // locked once a unit is on the canvas
+  selectedSize = key;
+  document.querySelectorAll('.size-opt').forEach(o =>
+    o.classList.toggle('selected', o.dataset.size === key));
+  buildGrid();                           // cell size (zoom) depends on module
+  updateStats(false);
+  updateBottomBar();
+}
+
+// Once units exist, grey out + lock the two non-selected options.
+function updatePickerLock() {
+  const locked = units.length > 0;
+  document.querySelectorAll('.size-opt').forEach(o => {
+    o.classList.toggle('locked', locked && o.dataset.size !== selectedSize);
+  });
+}
+
+/* ================================================================
+   GRID
+   ================================================================ */
+function cell() { return SIZES[selectedSize].cell; }
+
+function buildGrid() {
+  const c = cell();
+  gridEl.style.width  = (GRID * c) + 'px';
+  gridEl.style.height = (GRID * c) + 'px';
+  gridEl.style.backgroundSize = c + 'px ' + c + 'px';
+}
+
+// Find the unit occupying a given cell, if any.
+function unitAt(col, row) {
+  const id = occupied[row + ',' + col];
+  return id != null ? units.find(u => u.id === id) : null;
+}
+
+// Does a w×h footprint at (col,row) overlap anything / fall off-grid?
+function overlaps(col, row, w, h) {
+  if (col < 0 || row < 0 || col + w > GRID || row + h > GRID) return true;
+  for (let r = row; r < row + h; r++)
+    for (let cc = col; cc < col + w; cc++)
+      if (occupied[r + ',' + cc] != null) return true;
+  return false;
+}
+
+// Can the user place another unit right now?
+function canPlace() {
+  return leadCaptured || units.length < 4;
+}
+
+/* ----- click: place on empty cell, remove on a placed unit ----- */
+gridEl.addEventListener('click', e => {
+  const rect = gridEl.getBoundingClientRect();
+  const c = cell();
+  const col = Math.floor((e.clientX - rect.left) / c);
+  const row = Math.floor((e.clientY - rect.top)  / c);
+
+  const hit = unitAt(col, row);
+  if (hit) { removeUnit(hit); return; }
+
+  if (!canPlace()) { openLeadModal(); return; }   // gated -> prompt for details
+  tryPlace(col, row);
+});
+
+/* ----- hover ghost preview ----- */
+gridEl.addEventListener('mousemove', e => {
+  const rect = gridEl.getBoundingClientRect();
+  const c = cell();
+  let col = Math.floor((e.clientX - rect.left) / c);
+  let row = Math.floor((e.clientY - rect.top)  / c);
+  const w = SIZES[selectedSize].w, h = UNIT_H;
+  col = Math.min(Math.max(col, 0), GRID - w);
+  row = Math.min(Math.max(row, 0), GRID - h);
+
+  ghostEl.style.display = 'block';
+  ghostEl.style.left   = (gridEl.offsetLeft + col * c) + 'px';
+  ghostEl.style.top    = (gridEl.offsetTop  + row * c) + 'px';
+  ghostEl.style.width  = (w * c) + 'px';
+  ghostEl.style.height = (h * c) + 'px';
+  const blocked = overlaps(col, row, w, h) || !canPlace();
+  ghostEl.classList.toggle('blocked', blocked);
+});
+gridEl.addEventListener('mouseleave', () => { ghostEl.style.display = 'none'; });
+
+/* ----- place a unit ----- */
+function tryPlace(col, row) {
+  const w = SIZES[selectedSize].w, h = UNIT_H;
+  // clamp anchor so the footprint always fits inside the grid
+  col = Math.min(Math.max(col, 0), GRID - w);
+  row = Math.min(Math.max(row, 0), GRID - h);
+  if (overlaps(col, row, w, h)) return;            // occupied -> ignore
+  placeUnit(col, row);
+}
+
+function placeUnit(col, row) {
+  const size = selectedSize;
+  const s = SIZES[size];
+  const w = s.w, h = UNIT_H, c = cell();
+  const id = ++unitId;
+
+  // build the unit element
+  const el = document.createElement('div');
+  el.className = 'unit dropping';
+  el.style.left   = (col * c) + 'px';
+  el.style.top    = (row * c) + 'px';
+  el.style.width  = (w * c) + 'px';
+  el.style.height = (h * c) + 'px';
+  el.style.setProperty('--seam', c + 'px');         // panel seam spacing tracks zoom
+  el.innerHTML =
+    '<div class="unit__roof"></div>' +
+    '<div class="unit__body"></div>' +
+    '<div class="unit__base"></div>';
+  gridEl.appendChild(el);
+
+  // record occupancy
+  for (let r = row; r < row + h; r++)
+    for (let cc = col; cc < col + w; cc++)
+      occupied[r + ',' + cc] = id;
+  units.push({ id, col, row, w, h, size, el });
+
+  // land effects roughly when the bounce settles
+  setTimeout(() => {
+    playThud();
+    spawnDust(col, row, w, h, c);
+  }, 340);
+
+  updatePickerLock();
+  updateStats(true);
+  updateBottomBar();
+
+  // lead gate: the moment the 4th unit lands, prompt before any more
+  if (units.length === 4 && !leadCaptured && !gateShown) {
+    gateShown = true;
+    setTimeout(openLeadModal, 520);
+  }
+}
+
+function removeUnit(u) {
+  for (let r = u.row; r < u.row + u.h; r++)
+    for (let cc = u.col; cc < u.col + u.w; cc++)
+      delete occupied[r + ',' + cc];
+  u.el.remove();
+  units = units.filter(x => x.id !== u.id);
+
+  // dropping below the gate threshold lifts the soft gate's nudge
+  if (units.length < 4) hideNudge();
+  if (units.length === 0) gateShown = false;
+
+  updatePickerLock();
+  updateStats(true);
+  updateBottomBar();
+}
+
+/* ================================================================
+   DUST PARTICLES (Web Animations API)
+   ================================================================ */
+function spawnDust(col, row, w, h, c) {
+  const baseX = gridEl.offsetLeft + (col + w / 2) * c;   // centre of the base
+  const baseY = gridEl.offsetTop  + (row + h) * c;
+  const wrap  = document.getElementById('canvasWrap');
+
+  for (let i = 0; i < 14; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const cyanish = Math.random() < 0.35;
+    p.style.background = cyanish ? 'rgba(0,200,255,.8)' : 'rgba(200,212,224,.85)';
+    const sz = 3 + Math.random() * 4;
+    p.style.width = p.style.height = sz + 'px';
+    p.style.left = baseX + 'px';
+    p.style.top  = baseY + 'px';
+    wrap.appendChild(p);
+
+    const dx   = (Math.random() - 0.5) * 70;
+    const rise = 6 + Math.random() * 16;
+    const fall = 14 + Math.random() * 22;
+    p.animate([
+      { transform: 'translate(-50%,-50%) scale(1)',                          opacity: .9 },
+      { transform: `translate(${dx*0.6}px,${-rise}px) scale(.8)`,            opacity: .8, offset: .4 },
+      { transform: `translate(${dx}px,${fall}px) scale(.2)`,                 opacity: 0 },
+    ], { duration: 430 + Math.random() * 260, easing: 'cubic-bezier(.2,.6,.4,1)' })
+     .onfinish = () => p.remove();
+  }
+}
+
+/* ================================================================
+   SOUND — short low thud + dust noise (Web Audio API)
+   ================================================================ */
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playThud() {
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+
+  // low-frequency thump
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(120, t);
+  osc.frequency.exponentialRampToValueAtTime(44, t + 0.18);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.55, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(t); osc.stop(t + 0.38);
+
+  // short filtered noise burst = the "dust" impact
+  const len = Math.floor(ctx.sampleRate * 0.18);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  const noise = ctx.createBufferSource(); noise.buffer = buf;
+  const nf = ctx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 1100;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.22, t);
+  ng.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
+  noise.connect(nf).connect(ng).connect(ctx.destination);
+  noise.start(t); noise.stop(t + 0.18);
+}
+
+/* ================================================================
+   STATS PANEL (with count-up animation)
+   ================================================================ */
+const statState = {};   // key -> last displayed numeric value
+
+function buildStats() {
+  statsEl.innerHTML = '';
+  STAT_DEFS.forEach(def => {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.id = 'stat-' + def.key;
+    card.innerHTML = `<div class="label">${def.label}</div><div class="value">&mdash;</div>`;
+    statsEl.appendChild(card);
+    statState[def.key] = 0;
+  });
+}
+
+function statTotal(def) {
+  const n = units.length;
+  if (def.key === 'units') return n;
+  return n * SIZES[selectedSize][def.key];     // all on-canvas units share one size
+}
+
+function updateStats(animate) {
+  STAT_DEFS.forEach(def => {
+    const card = document.getElementById('stat-' + def.key);
+    const valEl = card.querySelector('.value');
+    const from = statState[def.key];
+    const to   = statTotal(def);
+    statState[def.key] = to;
+
+    if (!animate) { valEl.textContent = to === 0 ? renderZero(def) : def.fmt(to); return; }
+
+    card.classList.remove('is-bumped'); void card.offsetWidth; card.classList.add('is-bumped');
+    countUp(valEl, from, to, def);
+  });
+}
+
+function renderZero(def) {
+  if (def.key === 'units') return '0';
+  if (def.key === 'flen')  return '—';
+  return '0 kW';
+}
+
+function countUp(el, from, to, def) {
+  const dur = 480, start = performance.now();
+  function frame(now) {
+    const t = Math.min((now - start) / dur, 1);
+    const eased = 1 - Math.pow(1 - t, 3);          // ease-out cubic
+    const v = from + (to - from) * eased;
+    el.textContent = (to === 0 && t >= 1) ? renderZero(def) : def.fmt(v);
+    if (t < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ================================================================
+   BOTTOM BAR
+   ================================================================ */
+function updateBottomBar() {
+  bottomEl.innerHTML =
+    `<span>${units.length}</span> &times; ${SIZES[selectedSize].label} Powercores configured`;
+}
+
+/* ================================================================
+   LEAD CAPTURE MODAL
+   ================================================================ */
+function openLeadModal() {
+  document.getElementById('modalForm').style.display = leadCaptured ? 'none' : 'block';
+  document.getElementById('modalSuccess').style.display = leadCaptured ? 'block' : 'none';
+  overlay.classList.add('open');
+}
+function closeLeadModal() {
+  overlay.classList.remove('open');
+  // soft gate: dismissed without capturing AND already at the threshold
+  if (!leadCaptured && units.length >= 4) showNudge();
+}
+function showNudge() { nudgeEl.style.display = 'block'; }
+function hideNudge() { nudgeEl.style.display = 'none'; }
+
+document.getElementById('saveBtn').addEventListener('click', openLeadModal);
+document.getElementById('modalX').addEventListener('click', closeLeadModal);
+overlay.addEventListener('click', e => { if (e.target === overlay) closeLeadModal(); });
+
+document.getElementById('submitBtn').addEventListener('click', () => {
+  const ids = ['f_first', 'f_last', 'f_email', 'f_company'];
+  let ok = true;
+  ids.forEach(id => {
+    const inp = document.getElementById(id);
+    const valid = id === 'f_email'
+      ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inp.value.trim())
+      : inp.value.trim().length > 0;
+    inp.classList.toggle('invalid', !valid);
+    if (!valid) ok = false;
+  });
+  if (!ok) return;
+
+  leadCaptured = true;        // gate lifted permanently
+  hideNudge();
+  document.getElementById('modalForm').style.display = 'none';
+  document.getElementById('modalSuccess').style.display = 'block';
+  setTimeout(() => overlay.classList.remove('open'), 1600);
+});
+
+/* ================================================================
+   INIT
+   ================================================================ */
+buildLogo();
+buildPicker();
+buildGrid();
+buildStats();
+updateStats(false);
+updateBottomBar();
+</script>
+</body>
+</html>
