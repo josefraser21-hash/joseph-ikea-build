@@ -159,11 +159,34 @@
     align-items: center;
     justify-content: center;
     overflow: auto;
+    /* back wall / void — lightens very slightly toward the horizon */
     background:
-      radial-gradient(ellipse at 50% 38%, #0d1c2c 0%, var(--void) 70%);
+      linear-gradient(180deg, var(--void) 0%, #0a141f 58%, #0c1724 100%);
   }
+  /* side-on studio environment drawn behind the grid (floor + perspective) */
+  .env { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .env-floor {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 35%;
+    background: linear-gradient(180deg, #141d28 0%, #0d1117 100%);
+  }
+  .env-grid { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* background-image upload controls (top-right of the canvas area) */
+  .bg-controls {
+    position: absolute; top: 12px; right: 14px; z-index: 40;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .bg-btn {
+    background: rgba(15,28,43,.8); color: var(--grey);
+    border: 1px solid var(--line); border-radius: 7px;
+    padding: 6px 11px; font-family: var(--font); font-weight: 600; font-size: 12px;
+    cursor: pointer; backdrop-filter: blur(4px);
+  }
+  .bg-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+  .bg-clear { color: var(--grey); font-size: 12px; text-decoration: none; }
+  .bg-clear:hover { color: var(--cyan); }
   #grid {
     position: relative;
+    z-index: 1;
     /* faint guide lines — nearly invisible */
     background-color: transparent;
     background-image:
@@ -461,9 +484,16 @@
 
     <!-- CENTRE: canvas -->
     <div class="canvas-wrap" id="canvasWrap">
+      <div class="env" id="env"></div>
+      <div class="bg-controls">
+        <button class="bg-btn" id="bgSet">Set background</button>
+        <a class="bg-clear" id="bgClear" href="#" style="display:none">&times; Clear</a>
+        <input type="file" id="bgInput" accept="image/*" hidden />
+      </div>
       <div id="grid"></div>
       <div class="ghost" id="ghost"></div>
       <div class="nudge" id="nudge">Enter your details to keep building</div>
+      <div class="nudge" id="adjToast" style="top:auto;bottom:18px;background:rgba(255,90,90,.12);">Modules must connect to an existing unit.</div>
     </div>
 
     <!-- RIGHT: live stats -->
@@ -571,6 +601,60 @@ const pickerEl  = document.getElementById('picker');
 const statsEl   = document.getElementById('stats');
 const bottomEl  = document.getElementById('bottomCount');
 const overlay   = document.getElementById('overlay');
+const envEl     = document.getElementById('env');
+const wrapEl    = document.getElementById('canvasWrap');
+
+/* ================================================================
+   SIDE-ON STUDIO ENVIRONMENT — floor plane + receding perspective
+   lines drawn as an SVG layer behind the grid. Vanishing point sits
+   at the centre of the horizon (join between floor and void).
+   ================================================================ */
+function buildEnv() {
+  const vpx = 50, hy = 65;   // vanishing point x (%) and horizon y (%)
+  let lines = '';
+  // converging lines: fan from the bottom edge up to the vanishing point
+  for (let x = -30; x <= 130; x += 7) {
+    lines += `<line x1="${x}" y1="100" x2="${vpx}" y2="${hy}" stroke="rgba(150,190,225,1)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+  }
+  // depth lines parallel to the horizon, spaced closer near the horizon
+  for (let i = 1; i <= 10; i++) {
+    const t = i / 10;
+    const y = (hy + (100 - hy) * (t * t)).toFixed(2);
+    lines += `<line x1="0" y1="${y}" x2="100" y2="${y}" stroke="rgba(150,190,225,1)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+  }
+  envEl.innerHTML =
+    `<div class="env-floor"></div>
+     <svg class="env-grid" viewBox="0 0 100 100" preserveAspectRatio="none">
+       <g opacity="0.08">${lines}</g>
+       <line x1="0" y1="${hy}" x2="100" y2="${hy}" stroke="rgba(0,200,255,0.12)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+     </svg>`;
+}
+
+/* ----- background-image upload (overrides the studio environment) ----- */
+const bgInput = document.getElementById('bgInput');
+document.getElementById('bgSet').addEventListener('click', () => bgInput.click());
+bgInput.addEventListener('change', () => {
+  const file = bgInput.files && bgInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    wrapEl.style.backgroundImage    = `url(${e.target.result})`;
+    wrapEl.style.backgroundSize     = 'cover';
+    wrapEl.style.backgroundPosition = 'center';
+    envEl.style.display = 'none';                       // hide studio floor under the photo
+    document.getElementById('bgClear').style.display = 'inline';
+  };
+  reader.readAsDataURL(file);
+});
+document.getElementById('bgClear').addEventListener('click', e => {
+  e.preventDefault();
+  wrapEl.style.backgroundImage = '';                    // restore the CSS gradient
+  wrapEl.style.backgroundSize = '';
+  wrapEl.style.backgroundPosition = '';
+  envEl.style.display = '';
+  document.getElementById('bgClear').style.display = 'none';
+  bgInput.value = '';
+});
 
 /* ================================================================
    DURATA LOGO — recreated as inline SVG (13-fold circle rosette)
@@ -637,18 +721,40 @@ function buildPicker() {
 }
 
 function selectSize(key) {
-  if (units.length > 0) return;          // locked once a unit is on the canvas
+  // Allowed while the canvas is empty OR holds only the pre-loaded default unit.
+  const onlyDefault = units.length === 0 || (units.length <= 1 && units[0] && units[0].isDefault);
+  if (!onlyDefault) return;              // locked once a second unit is placed
+  if (key === selectedSize) return;
+
   selectedSize = key;
   document.querySelectorAll('.size-opt').forEach(o =>
     o.classList.toggle('selected', o.dataset.size === key));
+
+  clearAllUnits();                       // remove the old default unit
   buildGrid();                           // cell size (zoom) depends on module
-  updateStats(false);
+  placeDefaultUnit();                    // drop in a fresh default of the new size
   updateBottomBar();
 }
 
-// Once units exist, grey out + lock the two non-selected options.
+// Remove every unit from the canvas and reset placement state.
+function clearAllUnits() {
+  units.forEach(u => u.el.remove());
+  units = [];
+  occupied = {};
+  hideNudge();
+}
+
+// Place a single, centred, swappable default unit of the current size.
+function placeDefaultUnit() {
+  const w = SIZES[selectedSize].w;
+  const col = Math.round((GRID - w) / 2);      // centred (2.4MW -> col 14)
+  const row = Math.round((GRID - UNIT_H) / 2); // centred vertically (row 15)
+  placeUnit(col, row, true);
+}
+
+// Lock + grey out the non-selected sizes only once a SECOND unit exists.
 function updatePickerLock() {
-  const locked = units.length > 0;
+  const locked = units.length > 1;
   document.querySelectorAll('.size-opt').forEach(o => {
     o.classList.toggle('locked', locked && o.dataset.size !== selectedSize);
   });
@@ -686,6 +792,29 @@ function canPlace() {
   return leadCaptured || units.length < 4;
 }
 
+// Edge-adjacency: does any cell on the proposed footprint's perimeter (one
+// cell outward, sharing an edge — not diagonal) fall on an occupied cell?
+function isAdjacent(col, row, w, h) {
+  for (let r = row - 1; r <= row + h; r++) {
+    for (let c = col - 1; c <= col + w; c++) {
+      const horiz = (r >= row && r < row + h) && (c === col - 1 || c === col + w);
+      const vert  = (c >= col && c < col + w) && (r === row - 1 || r === row + h);
+      if (!(horiz || vert)) continue;          // skip interior + diagonal cells
+      if (occupied[r + ',' + c] != null) return true;
+    }
+  }
+  return false;
+}
+
+// Brief red nudge when the adjacency rule blocks a placement.
+let adjTimer = null;
+function showAdjToast() {
+  const t = document.getElementById('adjToast');
+  t.style.display = 'block';
+  clearTimeout(adjTimer);
+  adjTimer = setTimeout(() => { t.style.display = 'none'; }, 1600);
+}
+
 /* ----- click: place on empty cell, remove on a placed unit ----- */
 gridEl.addEventListener('click', e => {
   const rect = gridEl.getBoundingClientRect();
@@ -715,7 +844,8 @@ gridEl.addEventListener('mousemove', e => {
   ghostEl.style.top    = (gridEl.offsetTop  + row * c) + 'px';
   ghostEl.style.width  = (w * c) + 'px';
   ghostEl.style.height = (h * c) + 'px';
-  const blocked = overlaps(col, row, w, h) || !canPlace();
+  const blocked = overlaps(col, row, w, h) || !canPlace() ||
+                  (units.length >= 1 && !isAdjacent(col, row, w, h));
   ghostEl.classList.toggle('blocked', blocked);
 });
 gridEl.addEventListener('mouseleave', () => { ghostEl.style.display = 'none'; });
@@ -727,10 +857,12 @@ function tryPlace(col, row) {
   col = Math.min(Math.max(col, 0), GRID - w);
   row = Math.min(Math.max(row, 0), GRID - h);
   if (overlaps(col, row, w, h)) return;            // occupied -> ignore
+  // from the second placement on, new units must connect to an existing one
+  if (units.length >= 1 && !isAdjacent(col, row, w, h)) { showAdjToast(); return; }
   placeUnit(col, row);
 }
 
-function placeUnit(col, row) {
+function placeUnit(col, row, isDefault = false) {
   const size = selectedSize;
   const s = SIZES[size];
   const w = s.w, h = UNIT_H, c = cell();
@@ -754,7 +886,7 @@ function placeUnit(col, row) {
   for (let r = row; r < row + h; r++)
     for (let cc = col; cc < col + w; cc++)
       occupied[r + ',' + cc] = id;
-  units.push({ id, col, row, w, h, size, el });
+  units.push({ id, col, row, w, h, size, el, isDefault });
 
   // land effects roughly when the bounce settles
   setTimeout(() => {
@@ -967,10 +1099,12 @@ document.getElementById('submitBtn').addEventListener('click', () => {
    INIT
    ================================================================ */
 buildLogo();
+buildEnv();
 buildPicker();
 buildGrid();
 buildStats();
 updateStats(false);
+placeDefaultUnit();        // pre-load one centred 2.4MW Powercore
 updateBottomBar();
 </script>
 </body>
