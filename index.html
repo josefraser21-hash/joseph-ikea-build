@@ -159,9 +159,19 @@
     align-items: center;
     justify-content: center;
     overflow: auto;
+    background: var(--void);
+  }
+  /* fixed 1280x720 render frame that holds the environment + grid */
+  .stage {
+    position: relative;
+    flex: 0 0 auto;
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    border-radius: 6px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55);
     /* back wall / void — lightens very slightly toward the horizon */
-    background:
-      linear-gradient(180deg, var(--void) 0%, #0a141f 58%, #0c1724 100%);
+    background: linear-gradient(180deg, var(--void) 0%, #0a141f 58%, #0c1724 100%);
   }
   /* side-on studio environment drawn behind the grid (floor + perspective) */
   .env { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
@@ -185,14 +195,13 @@
   .bg-clear { color: var(--grey); font-size: 12px; text-decoration: none; }
   .bg-clear:hover { color: var(--cyan); }
   #grid {
-    position: relative;
+    position: absolute;
     z-index: 1;
     /* faint guide lines — nearly invisible */
     background-color: transparent;
     background-image:
       linear-gradient(rgba(120,180,220,.045) 1px, transparent 1px),
       linear-gradient(90deg, rgba(120,180,220,.045) 1px, transparent 1px);
-    box-shadow: 0 30px 80px rgba(0,0,0,.5);
     cursor: pointer;
   }
 
@@ -484,16 +493,18 @@
 
     <!-- CENTRE: canvas -->
     <div class="canvas-wrap" id="canvasWrap">
-      <div class="env" id="env"></div>
       <div class="bg-controls">
         <button class="bg-btn" id="bgSet">Set background</button>
         <a class="bg-clear" id="bgClear" href="#" style="display:none">&times; Clear</a>
         <input type="file" id="bgInput" accept="image/*" hidden />
       </div>
-      <div id="grid"></div>
-      <div class="ghost" id="ghost"></div>
-      <div class="nudge" id="nudge">Enter your details to keep building</div>
-      <div class="nudge" id="adjToast" style="top:auto;bottom:18px;background:rgba(255,90,90,.12);">Modules must connect to an existing unit.</div>
+      <div class="stage" id="stage">
+        <div class="env" id="env"></div>
+        <div id="grid"></div>
+        <div class="ghost" id="ghost"></div>
+        <div class="nudge" id="nudge">Enter your details to keep building</div>
+        <div class="nudge" id="adjToast" style="top:auto;bottom:18px;background:rgba(255,90,90,.12);">Modules must connect to an existing unit.</div>
+      </div>
     </div>
 
     <!-- RIGHT: live stats -->
@@ -557,6 +568,7 @@
    ================================================================ */
 const GRID = 32;          // grid is 32 x 32 cells
 const UNIT_H = 2;         // every Powercore is 2 cells tall
+const STAGE_W = 1280, STAGE_H = 720;   // fixed render-frame dimensions
 
 // Per-size definition.
 //  w    = width in grid cells
@@ -602,7 +614,7 @@ const statsEl   = document.getElementById('stats');
 const bottomEl  = document.getElementById('bottomCount');
 const overlay   = document.getElementById('overlay');
 const envEl     = document.getElementById('env');
-const wrapEl    = document.getElementById('canvasWrap');
+const stageEl   = document.getElementById('stage');
 
 /* ================================================================
    SIDE-ON STUDIO ENVIRONMENT — floor plane + receding perspective
@@ -638,9 +650,9 @@ bgInput.addEventListener('change', () => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    wrapEl.style.backgroundImage    = `url(${e.target.result})`;
-    wrapEl.style.backgroundSize     = 'cover';
-    wrapEl.style.backgroundPosition = 'center';
+    stageEl.style.backgroundImage    = `url(${e.target.result})`;
+    stageEl.style.backgroundSize     = 'cover';
+    stageEl.style.backgroundPosition = 'center';
     envEl.style.display = 'none';                       // hide studio floor under the photo
     document.getElementById('bgClear').style.display = 'inline';
   };
@@ -648,9 +660,9 @@ bgInput.addEventListener('change', () => {
 });
 document.getElementById('bgClear').addEventListener('click', e => {
   e.preventDefault();
-  wrapEl.style.backgroundImage = '';                    // restore the CSS gradient
-  wrapEl.style.backgroundSize = '';
-  wrapEl.style.backgroundPosition = '';
+  stageEl.style.backgroundImage = '';                   // restore the CSS gradient
+  stageEl.style.backgroundSize = '';
+  stageEl.style.backgroundPosition = '';
   envEl.style.display = '';
   document.getElementById('bgClear').style.display = 'none';
   bgInput.value = '';
@@ -763,12 +775,17 @@ function updatePickerLock() {
 /* ================================================================
    GRID
    ================================================================ */
-function cell() { return SIZES[selectedSize].cell; }
+// Single fixed cell size so the whole 32x32 grid fits inside the 720px frame.
+const CELL = Math.floor((STAGE_H - 48) / GRID);   // -> 21px, grid = 672px
+function cell() { return CELL; }
 
 function buildGrid() {
   const c = cell();
-  gridEl.style.width  = (GRID * c) + 'px';
-  gridEl.style.height = (GRID * c) + 'px';
+  const px = GRID * c;
+  gridEl.style.width  = px + 'px';
+  gridEl.style.height = px + 'px';
+  gridEl.style.left   = Math.round((STAGE_W - px) / 2) + 'px';  // centred horizontally
+  gridEl.style.top    = (STAGE_H - px - 16) + 'px';             // rests on the floor
   gridEl.style.backgroundSize = c + 'px ' + c + 'px';
 }
 
@@ -927,7 +944,7 @@ function removeUnit(u) {
 function spawnDust(col, row, w, h, c) {
   const baseX = gridEl.offsetLeft + (col + w / 2) * c;   // centre of the base
   const baseY = gridEl.offsetTop  + (row + h) * c;
-  const wrap  = document.getElementById('canvasWrap');
+  const wrap  = stageEl;
 
   for (let i = 0; i < 14; i++) {
     const p = document.createElement('div');
