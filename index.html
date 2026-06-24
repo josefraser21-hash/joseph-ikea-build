@@ -747,8 +747,8 @@ function clearAllUnits() {
 // Place a single, centred, swappable default unit of the current size.
 function placeDefaultUnit() {
   const w = SIZES[selectedSize].w;
-  const col = Math.round((GRID - w) / 2);      // centred (2.4MW -> col 14)
-  const row = Math.round((GRID - UNIT_H) / 2); // centred vertically (row 15)
+  const col = Math.round((GRID - w) / 2);      // centred horizontally (2.4MW -> col 14)
+  const row = GRID - UNIT_H;                    // bottom row — sits on the floor
   placeUnit(col, row, true);
 }
 
