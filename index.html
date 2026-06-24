@@ -1043,6 +1043,18 @@ function attemptPlace(type, key, col, row) {
   placeUnit(type, key, col, row);
 }
 
+// GPU Hall sprite: use gpu-hall.svg or gpu-hall.png if shipped alongside the
+// file, trying each in turn; if none load, the CSS fallback render is kept.
+const GPU_SPRITES = ['gpu-hall.svg', 'gpu-hall.png'];
+function attachGpuSprite(el) {
+  const img = document.createElement('img');
+  img.className = 'gpu-img'; img.alt = 'GPU Hall';
+  let i = 0;
+  img.onerror = () => { if (++i < GPU_SPRITES.length) img.src = GPU_SPRITES[i]; else img.remove(); };
+  img.src = GPU_SPRITES[0];
+  el.appendChild(img);
+}
+
 function placeUnit(type, key, col, row) {
   const d = (type === 'power' ? POWER : GPU)[key];
   const w = d.w, h = d.h, c = CELL;
@@ -1062,16 +1074,12 @@ function placeUnit(type, key, col, row) {
       '<div class="unit__body"></div>' +
       '<div class="unit__base"></div>';
   } else {
-    // CSS fallback render; if gpu-hall.svg is present it overlays on load
+    // CSS fallback render; a sprite file (if present) overlays it on load
     el.innerHTML =
       '<div class="unit__gpu-body"></div>' +
       '<div class="unit__gpu-led top"></div>' +
       '<div class="unit__gpu-led bot"></div>';
-    const img = document.createElement('img');
-    img.className = 'gpu-img'; img.alt = 'GPU Hall';
-    img.onerror = () => img.remove();               // absent -> keep CSS fallback
-    img.src = 'gpu-hall.svg';
-    el.appendChild(img);
+    attachGpuSprite(el);
   }
   gridEl.appendChild(el);
 
