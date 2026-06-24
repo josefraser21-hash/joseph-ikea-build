@@ -539,6 +539,29 @@
     color: var(--cyan); font-weight: 700; margin: 14px 0 2px;
   }
   .stats-group.first { margin-top: 2px; }
+
+  /* ============================================================
+     v4 — flat-list divider, headline stat, selection + delete
+     ============================================================ */
+  .cat-divider { border-top: 1px solid rgba(255,255,255,.06); margin: 6px 0 2px; }
+
+  /* GPU Capacity headline card — the most prominent stat */
+  .stat-card.headline {
+    border-color: rgba(0,200,255,.35);
+    box-shadow: 0 0 0 1px rgba(0,200,255,.18) inset, 0 6px 18px rgba(0,200,255,.10);
+  }
+  .stat-card.headline .value { font-size: 28px; }
+  .stat-card.headline .sub { font-size: 12px; color: var(--grey); margin-top: 2px; min-height: 14px; }
+
+  /* selected (movable) module + its floating delete button */
+  .unit.selected { box-shadow: 0 0 0 2px var(--cyan), 0 0 20px rgba(0,200,255,.4) !important; z-index: 20; }
+  .del-btn {
+    position: absolute; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--cyan); color: #04222e; border: none;
+    font-size: 16px; font-weight: 700; line-height: 24px; text-align: center;
+    cursor: pointer; z-index: 60; box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  }
+  .del-btn:hover { filter: brightness(1.1); }
 </style>
 </head>
 <body>
@@ -560,15 +583,18 @@
   <!-- ===================== WORKSPACE ===================== -->
   <div class="workspace">
 
-    <!-- LEFT: module catalogue (Power / Compute tabs, draggable cards) -->
+    <!-- LEFT: module catalogue (flat list by default; tabs appear after 4 placements) -->
     <aside class="sidebar-left">
-      <div class="cat-tabs">
+      <div class="cat-tabs" id="catTabs" style="display:none">
         <button class="cat-tab active" data-cat="power">Power</button>
         <button class="cat-tab" data-cat="compute">Compute</button>
       </div>
+      <div class="picker-title" id="catPowerLabel">Power</div>
       <div id="catPower" class="cat-panel"></div>
-      <div id="catCompute" class="cat-panel" style="display:none"></div>
-      <div class="picker-caption" id="catCaption">Drag a Powercore onto the canvas</div>
+      <div class="cat-divider" id="catDivider"></div>
+      <div class="picker-title" id="catComputeLabel">Compute</div>
+      <div id="catCompute" class="cat-panel"></div>
+      <div class="picker-caption" id="catCaption">Drag any module onto the canvas</div>
     </aside>
 
     <!-- CENTRE: canvas -->
@@ -649,9 +675,11 @@
    ================================================================ */
 const STAGE_W = 1280, STAGE_H = 720;   // fixed render-frame dimensions
 
-// The grid stays a fixed 32x32. Cells fill the full 1280 width (40px each) and
-// the grid is bottom-aligned to the ground plane; modules stack UPWARD (floors).
-const COLS = 32, ROWS = 32, CELL = STAGE_W / COLS;   // 40px
+// Larger 56px cells so modules read at a good scale against the environment.
+// Grid is bottom-aligned to the ground plane; modules stack UPWARD (floors).
+const CELL = 56;
+const COLS = Math.floor(STAGE_W / CELL);   // 22
+const ROWS = 20;
 
 // A GPU Hall is powered only within this many adjacency hops of a Powercore.
 const POWER_MAX_DEPTH = 2;
@@ -670,25 +698,35 @@ const GPU = {
   'ai':       { label:'AI-Ready', w:4, h:3, racks:18, gpuPerRack:72, model:'Nvidia B300 Ultra', cooling:'Direct to Chip Liquid' },
 };
 
-// ---- STAT CARDS -------------------------------------------------------------
-// Powercore stats count ONLY Powercore units; GPU stats count only GPU Halls.
-const fmtInt = v => String(Math.round(v));
-const STAT_POWER = [
-  { key:'capacity', label:'Total Capacity',       fmt:fmtPower,     val:() => sumPower('capacity') },
-  { key:'pinfra',   label:'Power Infrastructure', fmt:fmtPower,     val:() => sumPower('power') },
-  { key:'mech',     label:'Mechanical Power',     fmt:fmtPower,     val:() => sumPower('mech') },
-  { key:'ups',      label:'UPS Capacity',         fmt:fmtPower,     val:() => sumPower('ups') },
-  { key:'flen',     label:'Footprint',            fmt:fmtFootprint, val:() => sumPower('flen') },
-  { key:'punits',   label:'Units Placed',         fmt:fmtInt,       val:() => powerUnits().length },
+// ---- STAT CARDS (single unified panel, fixed order) -------------------------
+const fmtInt       = v => String(Math.round(v));
+const fmtThousands = v => Math.round(v).toLocaleString('en-US');   // 6,480
+const GPU_FOOT = 16;   // each GPU Hall contributes 16m of footprint length
+
+const STATS = [
+  // 1. Total Capacity — sum of all Powercore MW
+  { key:'capacity', label:'Total Capacity', fmt:fmtPower, val:() => sumPower('capacity') },
+  // 2. GPU Capacity — headline: total GPUs + highest-tier model present
+  { key:'gpucap',   label:'GPU Capacity', headline:true, zeroDash:true,
+    fmt:fmtThousands,
+    val:() => gpuUnits().reduce((a,u) => a + GPU[u.key].racks * GPU[u.key].gpuPerRack, 0),
+    sub:() => highestGpuModel() },
+  // 3. Total Racks
+  { key:'racks', label:'Total Racks', fmt:v => fmtInt(v) + ' Racks', val:() => sumGpu('racks') },
+  // 4. Footprint — combined across ALL modules (Powercores + GPU Halls)
+  { key:'foot',  label:'Footprint', fmt:fmtFootprint, val:() => sumPower('flen') + gpuUnits().length * GPU_FOOT },
+  // 5/6. Powered / Unpowered GPU Halls
+  { key:'phalls', label:'Powered Halls',   fmt:fmtInt, val:() => gpuUnits().filter(u => u.powered).length },
+  { key:'uhalls', label:'Unpowered Halls', fmt:fmtInt, val:() => gpuUnits().filter(u => !u.powered).length },
 ];
-const STAT_GPU = [
-  { key:'ghalls', label:'GPU Halls',       fmt:fmtInt, val:() => gpuUnits().length },
-  { key:'racks',  label:'Total Racks',     fmt:fmtInt, val:() => sumGpu('racks') },
-  { key:'gpus',   label:'Total GPUs',      fmt:fmtInt, val:() => gpuUnits().reduce((a,u)=>a + GPU[u.key].racks * GPU[u.key].gpuPerRack, 0) },
-  { key:'phalls', label:'Powered Halls',   fmt:fmtInt, val:() => gpuUnits().filter(u=>u.powered).length },
-  { key:'uhalls', label:'Unpowered Halls', fmt:fmtInt, val:() => gpuUnits().filter(u=>!u.powered).length },
-];
-const ALL_STATS = STAT_POWER.concat(STAT_GPU);
+
+// Highest GPU tier model currently on the canvas (or null if none).
+function highestGpuModel() {
+  const order = ['standard', 'advanced', 'ai'];
+  let best = -1;
+  gpuUnits().forEach(u => { best = Math.max(best, order.indexOf(u.key)); });
+  return best >= 0 ? GPU[order[best]].model : null;
+}
 
 /* ================================================================
    STATE
@@ -698,7 +736,10 @@ let occupied = {};            // "r,c" -> unit id
 let unitId = 0;
 let leadCaptured = false;     // has the lead form been submitted?
 let gateShown = false;        // has the lead gate auto-shown?
-let drag = null;              // active sidebar drag: { type, key, w, h }
+let drag = null;              // active drag: { type, key, w, h, move? }
+let selectedUnit = null;      // currently selected (movable) module
+let delBtn = null;            // floating delete button for the selection
+let currentTab = 'power';     // active sidebar tab once in tab mode
 
 /* ================================================================
    DOM
@@ -847,9 +888,9 @@ function fmtPower(kw) {                   // kW -> "x kW" or "x MW"
   if (kw >= 1000) return trim(kw / 1000) + ' MW';
   return Math.round(kw) + ' kW';
 }
-function fmtFootprint(len) {              // total length -> "L×4×4m"
+function fmtFootprint(len) {              // total length -> "L × 4 × 4m"
   if (len <= 0) return '—';
-  return trim(len) + '×4×4m';
+  return trim(len) + ' × 4 × 4m';
 }
 
 /* ================================================================
@@ -883,17 +924,33 @@ function buildCatalog() {
     wireCard(card, 'gpu', key);
     cp.appendChild(card);
   });
-  // tab switching
+  // tab switching (only meaningful once tab mode is active)
   document.querySelectorAll('.cat-tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      const power = tab.dataset.cat === 'power';
-      document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('active', t === tab));
-      document.getElementById('catPower').style.display   = power ? 'flex' : 'none';
-      document.getElementById('catCompute').style.display = power ? 'none' : 'flex';
-      document.getElementById('catCaption').textContent   =
-        power ? 'Drag a Powercore onto the canvas' : 'Drag a GPU Hall onto the canvas';
+      currentTab = tab.dataset.cat;
+      updateSidebarMode();
     });
   });
+  updateSidebarMode();
+}
+
+// Flat ALL view by default; the Power/Compute tab bar appears after 4 placements.
+function updateSidebarMode() {
+  const tabMode = units.length >= 4;
+  const power = currentTab === 'power';
+  document.getElementById('catTabs').style.display         = tabMode ? 'flex' : 'none';
+  document.getElementById('catPowerLabel').style.display   = tabMode ? 'none' : 'block';
+  document.getElementById('catComputeLabel').style.display = tabMode ? 'none' : 'block';
+  document.getElementById('catDivider').style.display      = tabMode ? 'none' : 'block';
+
+  // flat mode shows both groups; tab mode shows only the active category
+  document.getElementById('catPower').style.display   = (!tabMode || power) ? 'flex' : 'none';
+  document.getElementById('catCompute').style.display = (!tabMode || !power) ? 'flex' : 'none';
+
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === currentTab));
+  document.getElementById('catCaption').textContent = !tabMode
+    ? 'Drag any module onto the canvas'
+    : (power ? 'Drag a Powercore onto the canvas' : 'Drag a GPU Hall onto the canvas');
 }
 
 /* ================================================================
@@ -918,6 +975,7 @@ function wireCard(card, type, key) {
   card.addEventListener('dragend', endDrag);
 }
 function endDrag() {
+  if (drag && drag.move) restoreUnit(drag.move);   // move cancelled (dropped off-grid)
   drag = null;
   ghostEl.style.display = 'none';
   document.querySelectorAll('.mod-card.dragging').forEach(c => c.classList.remove('dragging'));
@@ -934,54 +992,169 @@ function cellFromEvent(e) {
   };
 }
 
-// Position + colour the ghost preview for a w×h footprint at (col,row).
-function showGhost(col, row, w, h) {
-  col = clampN(col, 0, COLS - w);
-  row = clampN(row, 0, ROWS - h);
+/* ----- EKET feel: gravity snap, magnetic snap, nearest-valid ----- */
+
+// 2a — lowest valid (resting) row for a w×h footprint at column `col`:
+// scans up from the floor and returns the first row clear of overlaps, so the
+// module rests on the ground or on top of whatever is stacked beneath it.
+function gravityRow(col, w, h) {
+  for (let row = ROWS - h; row >= 0; row--) {
+    if (!overlaps(col, row, w, h)) return row;
+  }
+  return -1;   // column range full
+}
+
+// 2b — magnetic edge snap: if within 1.5 cells of an existing module's edge,
+// align the footprint exactly to that edge (returns adjusted {col,row}).
+function snapToEdge(col, row, w, h) {
+  const TH = 1.5;
+  let best = { col, row, rowSnapped: false }, bd = TH + 0.001;
+  units.forEach(u => {
+    const vOver = row < u.row + u.h && row + h > u.row;   // overlapping vertical span
+    const hOver = col < u.col + u.w && col + w > u.col;   // overlapping horizontal span
+    if (vOver) {                                          // snap left/right to u
+      let d = Math.abs(col - (u.col + u.w)); if (d < bd) { bd = d; best = { col: u.col + u.w, row, rowSnapped: false }; }
+      d = Math.abs((col + w) - u.col);       if (d < bd) { bd = d; best = { col: u.col - w, row, rowSnapped: false }; }
+    }
+    if (hOver) {                                          // snap top/bottom to u
+      let d = Math.abs(row - (u.row + u.h)); if (d < bd) { bd = d; best = { col, row: u.row + u.h, rowSnapped: true }; }
+      d = Math.abs((row + h) - u.row);       if (d < bd) { bd = d; best = { col, row: u.row - h, rowSnapped: true }; }
+    }
+  });
+  return best;
+}
+
+// 2d — nearest valid (no overlap, adjacent, on-grid) slot within 2 cells.
+function nearestValid(col, row, w, h) {
+  for (let r = 1; r <= 2; r++) {
+    let best = null, bd = 99;
+    for (let dr = -r; dr <= r; dr++) for (let dc = -r; dc <= r; dc++) {
+      if (Math.max(Math.abs(dr), Math.abs(dc)) !== r) continue;   // ring at radius r
+      const c = col + dc, rw = row + dr;
+      if (c < 0 || rw < 0 || c + w > COLS || rw + h > ROWS) continue;
+      if (overlaps(c, rw, w, h)) continue;
+      if (units.length > 0 && !isAdjacent(c, rw, w, h)) continue;
+      const d = Math.abs(dr) + Math.abs(dc);
+      if (d < bd) { bd = d; best = { col: c, row: rw }; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+// Resolve a raw cursor cell into the final snapped + settled + validated slot.
+function resolvePlacement(cx, cy, w, h) {
+  let col = clampN(cx, 0, COLS - w);
+  let row = clampN(cy, 0, ROWS - h);
+  const snap = snapToEdge(col, row, w, h);             // magnetic edge snap
+  col = clampN(snap.col, 0, COLS - w);
+  const cur = clampN(snap.row, 0, ROWS - h);
+
+  const g = gravityRow(col, w, h);                     // gravity: settle downward
+  if (snap.rowSnapped && !overlaps(col, cur, w, h)) row = cur;         // honour vertical snap
+  else if (g >= 0) { row = g; if (cur < g && !overlaps(col, cur, w, h)) row = cur; } // aim above stack
+  else row = cur;
+
+  let valid = row >= 0 && !overlaps(col, row, w, h) &&
+              (units.length === 0 || isAdjacent(col, row, w, h));
+  if (!valid) {                                        // snap to nearest valid slot
+    const near = nearestValid(col, row, w, h);
+    if (near) { col = near.col; row = near.row; valid = true; }
+  }
+  return { col, row, valid };
+}
+
+function showGhostAt(col, row, w, h, ok) {
   ghostEl.style.display = 'block';
   ghostEl.style.left   = (gridEl.offsetLeft + col * CELL) + 'px';
   ghostEl.style.top    = (gridEl.offsetTop  + row * CELL) + 'px';
   ghostEl.style.width  = (w * CELL) + 'px';
   ghostEl.style.height = (h * CELL) + 'px';
-  const blocked = !canPlace() || overlaps(col, row, w, h) ||
-                  (units.length >= 1 && !isAdjacent(col, row, w, h));
-  ghostEl.classList.toggle('blocked', blocked);
+  ghostEl.classList.toggle('blocked', !ok);
 }
 
-// Dragging over the stage updates the ghost; dropping attempts placement.
+// Dragging over the stage updates the snapped ghost; dropping places the module.
 stageEl.addEventListener('dragover', e => {
   if (!drag) return;
-  e.preventDefault();                       // allow the drop
-  e.dataTransfer.dropEffect = 'copy';
+  e.preventDefault();
+  e.dataTransfer.dropEffect = drag.move ? 'move' : 'copy';
   const { col, row } = cellFromEvent(e);
-  showGhost(col, row, drag.w, drag.h);
+  const p = resolvePlacement(col, row, drag.w, drag.h);
+  showGhostAt(p.col, p.row, drag.w, drag.h, p.valid && (drag.move || canPlace()));
 });
 stageEl.addEventListener('drop', e => {
   if (!drag) return;
   e.preventDefault();
+  const moving = drag.move;
   const { col, row } = cellFromEvent(e);
-  attemptPlace(drag.type, drag.key, col, row);
+  const p = resolvePlacement(col, row, drag.w, drag.h);
+  if (!moving && !canPlace()) { openLeadModal(); endDrag(); return; }   // lead gate
+  if (p.valid) {
+    if (moving) { moving.el.remove(); drag.move = null; }   // lifted already; drop the old el
+    placeUnit(drag.type, drag.key, p.col, p.row);
+  } else {
+    showAdjToast();
+    if (moving) { restoreUnit(moving); drag.move = null; }
+  }
   endDrag();
 });
 stageEl.addEventListener('dragleave', e => { if (e.target === stageEl) ghostEl.style.display = 'none'; });
 
-/* ----- click a placed module to remove it ----- */
+/* ----- 2c — click to select, drag to reposition, × to delete ----- */
 gridEl.addEventListener('click', e => {
   const { col, row } = cellFromEvent(e);
   const hit = unitAt(col, row);
-  if (hit) removeUnit(hit);
+  if (hit) selectUnit(hit); else deselectUnit();
 });
 
+function selectUnit(u) {
+  if (selectedUnit === u) return;
+  deselectUnit();
+  selectedUnit = u;
+  u.el.classList.add('selected');
+  delBtn = document.createElement('button');
+  delBtn.className = 'del-btn'; delBtn.textContent = '×'; delBtn.title = 'Remove';
+  delBtn.addEventListener('click', ev => { ev.stopPropagation(); const t = selectedUnit; deselectUnit(); removeUnit(t); });
+  stageEl.appendChild(delBtn);
+  positionDelBtn();
+}
+function deselectUnit() {
+  if (selectedUnit) selectedUnit.el.classList.remove('selected');
+  selectedUnit = null;
+  if (delBtn) { delBtn.remove(); delBtn = null; }
+}
+function positionDelBtn() {
+  if (!selectedUnit || !delBtn) return;
+  const u = selectedUnit;
+  delBtn.style.left = (gridEl.offsetLeft + (u.col + u.w) * CELL - 24) + 'px';
+  delBtn.style.top  = (gridEl.offsetTop  + u.row * CELL - 28) + 'px';
+}
+
+// Lift a unit out of occupancy so it can be dragged without blocking itself.
+function liftUnit(u) {
+  for (let r = u.row; r < u.row + u.h; r++)
+    for (let c = u.col; c < u.col + u.w; c++) delete occupied[r + ',' + c];
+  units = units.filter(x => x !== u);
+  u.el.style.opacity = '.3';
+}
+function restoreUnit(u) {     // put a lifted unit back if its move is cancelled
+  for (let r = u.row; r < u.row + u.h; r++)
+    for (let c = u.col; c < u.col + u.w; c++) occupied[r + ',' + c] = u.id;
+  units.push(u);
+  u.el.style.opacity = '';
+  recomputePower();
+}
+
 /* ================================================================
-   GRID — fixed 32x32, full image width, bottom-aligned to the ground
-   plane. Cells above the ground extend upward so modules stack as floors.
+   GRID — fixed 22x20 (56px cells), centred horizontally and bottom-aligned
+   to the ground plane. Cells above the ground extend upward (floors).
    ================================================================ */
 function buildGrid() {
-  const w = COLS * CELL, h = ROWS * CELL;   // 1280 x 1280
+  const w = COLS * CELL, h = ROWS * CELL;
   gridEl.style.width  = w + 'px';
   gridEl.style.height = h + 'px';
-  gridEl.style.left   = '0px';
-  gridEl.style.top    = (STAGE_H - h) + 'px';   // bottom row sits on the pavement
+  gridEl.style.left   = Math.round((STAGE_W - w) / 2) + 'px';   // centred
+  gridEl.style.top    = (STAGE_H - h) + 'px';                   // bottom on the pavement
   gridEl.style.backgroundSize = CELL + 'px ' + CELL + 'px';
   sizeFlow();                                   // keep the flow canvas aligned
 }
@@ -1027,20 +1200,6 @@ function showAdjToast() {
   t.style.display = 'block';
   clearTimeout(adjTimer);
   adjTimer = setTimeout(() => { t.style.display = 'none'; }, 1600);
-}
-
-/* ----- validate a drop, then place (or give feedback) ----- */
-function attemptPlace(type, key, col, row) {
-  const d = (type === 'power' ? POWER : GPU)[key];
-  const w = d.w, h = d.h;
-  col = clampN(col, 0, COLS - w);
-  row = clampN(row, 0, ROWS - h);
-
-  if (!canPlace()) { openLeadModal(); return; }              // lead gate
-  if (overlaps(col, row, w, h)) return;                      // overlap / off-grid
-  // the very first module is unconstrained; every later one must connect
-  if (units.length >= 1 && !isAdjacent(col, row, w, h)) { showAdjToast(); return; }
-  placeUnit(type, key, col, row);
 }
 
 // GPU Hall sprite: use gpu-hall.svg or gpu-hall.png if shipped alongside the
@@ -1090,12 +1249,26 @@ function placeUnit(type, key, col, row) {
   const u = { id, type, key, col, row, w, h, el, powered: false, depth: Infinity };
   units.push(u);
 
+  // placed modules are draggable to reposition (2c)
+  el.draggable = true;
+  el.addEventListener('dragstart', e => {
+    e.stopPropagation();
+    deselectUnit();
+    drag = { type: u.type, key: u.key, w: u.w, h: u.h, move: u };
+    liftUnit(u);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'move');
+    try { e.dataTransfer.setDragImage(blankImg, 0, 0); } catch (_) {}
+  });
+  el.addEventListener('dragend', endDrag);
+
   // land effects roughly when the bounce settles (existing drop + dust + thud)
   setTimeout(() => { playThud(); spawnDust(col, row, w, h, c); }, 340);
 
   recomputePower();
   updateStats(true);
   updateBottomBar();
+  updateSidebarMode();
 
   // lead gate: prompt once the 6th module lands
   if (units.length === 6 && !leadCaptured && !gateShown) {
@@ -1105,6 +1278,7 @@ function placeUnit(type, key, col, row) {
 }
 
 function removeUnit(u) {
+  if (selectedUnit === u) deselectUnit();
   for (let r = u.row; r < u.row + u.h; r++)
     for (let cc = u.col; cc < u.col + u.w; cc++)
       delete occupied[r + ',' + cc];
@@ -1117,6 +1291,7 @@ function removeUnit(u) {
   recomputePower();
   updateStats(true);
   updateBottomBar();
+  updateSidebarMode();
 }
 
 /* ================================================================
@@ -1295,8 +1470,7 @@ function playThud() {
 }
 
 /* ================================================================
-   STATS PANEL — two count-up sections. Powercore Stats count only
-   Powercores; GPU Hall Stats count only GPU Halls.
+   STATS PANEL — single unified, count-up panel (see STATS order).
    ================================================================ */
 const statState = {};   // key -> last displayed numeric value
 
@@ -1307,45 +1481,45 @@ const sumGpu   = field => gpuUnits().reduce((a, u) => a + GPU[u.key][field], 0);
 
 function buildStats() {
   statsEl.innerHTML = '';
-  addStatGroup('Powercore Stats', STAT_POWER, true);
-  addStatGroup('GPU Hall Stats',  STAT_GPU,   false);
-}
-function addStatGroup(title, defs, first) {
-  const hd = document.createElement('div');
-  hd.className = 'stats-group' + (first ? ' first' : '');
-  hd.textContent = title;
-  statsEl.appendChild(hd);
-  defs.forEach(def => {
+  STATS.forEach(def => {
     const card = document.createElement('div');
-    card.className = 'stat-card';
+    card.className = 'stat-card' + (def.headline ? ' headline' : '');
     card.id = 'stat-' + def.key;
-    card.innerHTML = `<div class="label">${def.label}</div><div class="value">&mdash;</div>`;
+    card.innerHTML = `<div class="label">${def.label}</div><div class="value">&mdash;</div>`
+                   + (def.headline ? '<div class="sub"></div>' : '');
     statsEl.appendChild(card);
     statState[def.key] = 0;
   });
 }
 
+// Per-def render: em-dash at zero for "zeroDash" stats, otherwise the formatter.
+function renderStat(def, v) {
+  return (def.zeroDash && Math.round(v) <= 0) ? '—' : def.fmt(v);
+}
+
 function updateStats(animate) {
-  ALL_STATS.forEach(def => {
+  STATS.forEach(def => {
     const card = document.getElementById('stat-' + def.key);
     const valEl = card.querySelector('.value');
+    if (def.headline) card.querySelector('.sub').textContent = def.sub() || '';
+
     const from = statState[def.key];
     const to   = def.val();
     statState[def.key] = to;
 
-    if (!animate) { valEl.textContent = def.fmt(to); return; }
+    if (!animate) { valEl.textContent = renderStat(def, to); return; }
 
     card.classList.remove('is-bumped'); void card.offsetWidth; card.classList.add('is-bumped');
-    countUp(valEl, from, to, def);
+    countUp(valEl, from, to, v => renderStat(def, v));
   });
 }
 
-function countUp(el, from, to, def) {
+function countUp(el, from, to, render) {
   const dur = 480, start = performance.now();
   function frame(now) {
     const t = Math.min((now - start) / dur, 1);
     const eased = 1 - Math.pow(1 - t, 3);          // ease-out cubic
-    el.textContent = def.fmt(from + (to - from) * eased);
+    el.textContent = render(from + (to - from) * eased);
     if (t < 1) requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
