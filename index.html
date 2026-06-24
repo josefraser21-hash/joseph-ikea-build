@@ -568,6 +568,7 @@
    ================================================================ */
 const UNIT_H = 2;         // every Powercore is 2 cells tall
 const STAGE_W = 1280, STAGE_H = 720;   // fixed render-frame dimensions
+const HORIZON = 0.64;    // fraction down the frame where the ground plane begins
 
 // Grid geometry is derived per size (in buildGrid) so the grid fills the whole
 // 1280x720 frame and an exact number of units tiles across each row.
@@ -671,6 +672,20 @@ document.getElementById('bgClear').addEventListener('click', e => {
   document.getElementById('bgClear').style.display = 'none';
   bgInput.value = '';
 });
+
+// Optional baked-in backdrop: if assets/backdrop.jpg ships with the file it
+// becomes the default environment; otherwise the drawn studio scene is kept.
+(function loadDefaultBackdrop() {
+  const img = new Image();
+  img.onload = () => {
+    stageEl.style.backgroundImage    = `url(${img.src})`;
+    stageEl.style.backgroundSize     = 'cover';
+    stageEl.style.backgroundPosition = 'center';
+    envEl.style.display = 'none';
+    document.getElementById('bgClear').style.display = 'inline';
+  };
+  img.src = 'assets/backdrop.jpg';
+})();
 
 /* ================================================================
    DURATA LOGO — recreated as inline SVG (13-fold circle rosette)
@@ -783,15 +798,17 @@ function cell() { return CELL; }
 
 function buildGrid() {
   const cfg = SIZES[selectedSize];
-  COLS = cfg.cols;                    // multiple of the unit width
-  CELL = STAGE_W / COLS;              // fill the full 1280 width exactly
-  ROWS = Math.round(STAGE_H / CELL);  // rows to cover the full height
-  if (ROWS % 2) ROWS++;              // keep even — units are 2 cells tall
+  COLS = cfg.cols;                          // multiple of the unit width
+  CELL = STAGE_W / COLS;                    // fill the full 1280 width exactly
+  // Confine the grid to the ground plane (pavement) below the horizon so units
+  // always sit on the floor; rows are the most even count that fits that band.
+  const ground = STAGE_H * (1 - HORIZON);
+  ROWS = Math.max(2, 2 * Math.floor(ground / CELL / 2));
   const h = ROWS * CELL;
   gridEl.style.width  = STAGE_W + 'px';
   gridEl.style.height = h + 'px';
   gridEl.style.left   = '0px';
-  gridEl.style.top    = (STAGE_H - h) + 'px';   // bottom-aligned: units sit on the floor
+  gridEl.style.top    = (STAGE_H - h) + 'px';   // bottom-aligned: front edge on the pavement
   gridEl.style.backgroundSize = CELL + 'px ' + CELL + 'px';
 }
 
