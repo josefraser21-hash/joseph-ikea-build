@@ -159,17 +159,49 @@
     align-items: center;
     justify-content: center;
     overflow: auto;
-    background:
-      radial-gradient(ellipse at 50% 38%, #0d1c2c 0%, var(--void) 70%);
+    background: var(--void);
   }
-  #grid {
+  /* fixed 1280x720 render frame that holds the environment + grid */
+  .stage {
     position: relative;
+    flex: 0 0 auto;
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    border-radius: 6px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55);
+    /* back wall / void — lightens very slightly toward the horizon */
+    background: linear-gradient(180deg, var(--void) 0%, #0a141f 58%, #0c1724 100%);
+  }
+  /* side-on studio environment drawn behind the grid (floor + perspective) */
+  .env { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .env-floor {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 35%;
+    background: linear-gradient(180deg, #141d28 0%, #0d1117 100%);
+  }
+  .env-grid { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* background-image upload controls (top-right of the canvas area) */
+  .bg-controls {
+    position: absolute; top: 12px; right: 14px; z-index: 40;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .bg-btn {
+    background: rgba(15,28,43,.8); color: var(--grey);
+    border: 1px solid var(--line); border-radius: 7px;
+    padding: 6px 11px; font-family: var(--font); font-weight: 600; font-size: 12px;
+    cursor: pointer; backdrop-filter: blur(4px);
+  }
+  .bg-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+  .bg-clear { color: var(--grey); font-size: 12px; text-decoration: none; }
+  .bg-clear:hover { color: var(--cyan); }
+  #grid {
+    position: absolute;
+    z-index: 1;
     /* faint guide lines — nearly invisible */
     background-color: transparent;
     background-image:
       linear-gradient(rgba(120,180,220,.045) 1px, transparent 1px),
       linear-gradient(90deg, rgba(120,180,220,.045) 1px, transparent 1px);
-    box-shadow: 0 30px 80px rgba(0,0,0,.5);
     cursor: pointer;
   }
 
@@ -431,6 +463,131 @@
     display: inline-flex; align-items: center; justify-content: center;
     color: var(--cyan); font-size: 28px; margin-bottom: 10px;
   }
+
+  /* ============================================================
+     v3 — CATEGORY TABS + DRAGGABLE MODULE CARDS
+     ============================================================ */
+  .cat-tabs { display: flex; gap: 6px; margin-bottom: 4px; }
+  .cat-tab {
+    flex: 1; padding: 9px 0; background: var(--navy-2); color: var(--grey);
+    border: 1.5px solid transparent; border-radius: 8px; font-family: var(--font);
+    font-weight: 700; font-size: 13px; letter-spacing: .4px; cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .cat-tab:hover { background: var(--navy-3); color: var(--white); }
+  .cat-tab.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,200,255,.07); }
+  .cat-panel { display: flex; flex-direction: column; gap: 10px; }
+
+  .mod-card {
+    display: flex; align-items: center; gap: 12px; padding: 12px;
+    background: var(--navy-2); border: 1.5px solid transparent; border-radius: 10px;
+    cursor: grab; transition: background .15s ease, border-color .15s ease;
+  }
+  .mod-card:hover { background: var(--navy-3); border-color: rgba(0,200,255,.4); }
+  .mod-card:active { cursor: grabbing; }
+  .mod-card.dragging { opacity: .5; }
+  .mod-card__label { font-size: 15px; font-weight: 700; color: var(--white); }
+  .mod-card__sub { font-size: 11px; color: var(--grey); margin-top: 2px; line-height: 1.3; }
+
+  /* GPU hall thumbnail — taller than wide, dark, cyan accents */
+  .thumb-gpu {
+    flex: 0 0 auto; width: 22px; height: 30px; border-radius: 3px;
+    background: linear-gradient(180deg,#202632,#13171f);
+    border: 1.5px solid #2a3340; position: relative; overflow: hidden;
+    box-shadow: 0 0 8px rgba(0,200,255,.25);
+  }
+  .thumb-gpu::before { content:""; position:absolute; left:0; right:0; top:0;    height:3px; background:var(--cyan); }
+  .thumb-gpu::after  { content:""; position:absolute; left:0; right:0; bottom:0; height:3px; background:var(--cyan); }
+
+  /* ============================================================
+     v3 — GPU HALL UNIT (CSS fallback when gpu-hall.svg is absent)
+     ============================================================ */
+  .unit--gpu { border-color: #11161e; }
+  .unit__gpu-body {
+    position: absolute; inset: 0; background: #1a1f28;
+    /* vertical server-rack stripe detailing */
+    background-image: repeating-linear-gradient(90deg,
+      rgba(255,255,255,.05) 0, rgba(255,255,255,.05) 2px,
+      rgba(0,0,0,.28) 2px, rgba(0,0,0,.28) calc(var(--seam) * .5));
+  }
+  .unit__gpu-led {
+    position: absolute; left: 0; right: 0; height: 8%; min-height: 3px;
+    background: var(--cyan); box-shadow: 0 0 10px rgba(0,200,255,.9); opacity: .55; z-index: 1;
+  }
+  .unit__gpu-led.top { top: 0; }
+  .unit__gpu-led.bot { bottom: 0; }
+  .unit--gpu .gpu-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 3; }
+  /* unpowered: slightly grey-tinted, no glow */
+  .unit--gpu.unpowered { filter: grayscale(.5) brightness(.72); }
+  .unit--gpu.unpowered .unit__gpu-led { opacity: .15; box-shadow: none; }
+  /* powered: ambient cyan glow + bright LEDs */
+  .unit--gpu.powered {
+    box-shadow: 0 10px 22px rgba(0,0,0,.55), 0 0 26px 4px rgba(0,200,255,.45);
+  }
+  .unit--gpu.powered .unit__gpu-led { opacity: 1; }
+
+  /* ============================================================
+     v3 — POWER-FLOW CANVAS overlay (drawn on top of the grid)
+     ============================================================ */
+  #flow { position: absolute; z-index: 15; pointer-events: none; }
+
+  /* ============================================================
+     v3 — STATS GROUP HEADERS (Powercore Stats / GPU Hall Stats)
+     ============================================================ */
+  .stats-group {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--cyan); font-weight: 700; margin: 14px 0 2px;
+  }
+  .stats-group.first { margin-top: 2px; }
+
+  /* ============================================================
+     v4 — flat-list divider, headline stat, selection + delete
+     ============================================================ */
+  .cat-divider { border-top: 1px solid rgba(255,255,255,.06); margin: 6px 0 2px; }
+
+  /* GPU Capacity headline card — the most prominent stat */
+  .stat-card.headline {
+    border-color: rgba(0,200,255,.35);
+    box-shadow: 0 0 0 1px rgba(0,200,255,.18) inset, 0 6px 18px rgba(0,200,255,.10);
+  }
+  .stat-card.headline .value { font-size: 28px; }
+  .stat-card.headline .sub { font-size: 12px; color: var(--grey); margin-top: 2px; min-height: 14px; }
+
+  /* selected (movable) module + its floating delete button */
+  .unit.selected { box-shadow: 0 0 0 2px var(--cyan), 0 0 20px rgba(0,200,255,.4) !important; z-index: 20; }
+  .del-btn {
+    position: absolute; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--cyan); color: #04222e; border: none;
+    font-size: 16px; font-weight: 700; line-height: 24px; text-align: center;
+    cursor: pointer; z-index: 60; box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  }
+  .del-btn:hover { filter: brightness(1.1); }
+
+  /* GPU Hall Durata branding (centred on the unit face) */
+  .unit__gpu-brand {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .unit__gpu-logo {
+    width: 28px;
+    height: 28px;
+    opacity: 0.85;
+  }
+  .unit__gpu-wordmark {
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.75);
+    text-transform: uppercase;
+  }
 </style>
 </head>
 <body>
@@ -452,18 +609,35 @@
   <!-- ===================== WORKSPACE ===================== -->
   <div class="workspace">
 
-    <!-- LEFT: size picker -->
+    <!-- LEFT: module catalogue (flat list by default; tabs appear after 4 placements) -->
     <aside class="sidebar-left">
-      <div class="picker-title">Module Size</div>
-      <div id="picker"></div>
-      <div class="picker-caption">Select your Powercore capacity</div>
+      <div class="cat-tabs" id="catTabs" style="display:none">
+        <button class="cat-tab active" data-cat="power">Power</button>
+        <button class="cat-tab" data-cat="compute">Compute</button>
+      </div>
+      <div class="picker-title" id="catPowerLabel">Power</div>
+      <div id="catPower" class="cat-panel"></div>
+      <div class="cat-divider" id="catDivider"></div>
+      <div class="picker-title" id="catComputeLabel">Compute</div>
+      <div id="catCompute" class="cat-panel"></div>
+      <div class="picker-caption" id="catCaption">Drag any module onto the canvas</div>
     </aside>
 
     <!-- CENTRE: canvas -->
     <div class="canvas-wrap" id="canvasWrap">
-      <div id="grid"></div>
-      <div class="ghost" id="ghost"></div>
-      <div class="nudge" id="nudge">Enter your details to keep building</div>
+      <div class="bg-controls">
+        <button class="bg-btn" id="bgSet">Set background</button>
+        <a class="bg-clear" id="bgClear" href="#" style="display:none">&times; Clear</a>
+        <input type="file" id="bgInput" accept="image/*" hidden />
+      </div>
+      <div class="stage" id="stage">
+        <div class="env" id="env"></div>
+        <div id="grid"></div>
+        <canvas id="flow"></canvas>
+        <div class="ghost" id="ghost"></div>
+        <div class="nudge" id="nudge">Enter your details to keep building</div>
+        <div class="nudge" id="adjToast" style="top:auto;bottom:18px;background:rgba(255,90,90,.12);">Modules must connect to an existing unit.</div>
+      </div>
     </div>
 
     <!-- RIGHT: live stats -->
@@ -525,41 +699,77 @@
 /* ================================================================
    CONFIG
    ================================================================ */
-const GRID = 32;          // grid is 32 x 32 cells
-const UNIT_H = 2;         // every Powercore is 2 cells tall
+const STAGE_W = 1280, STAGE_H = 720;   // fixed render-frame dimensions
 
-// Per-size definition.
-//  w    = width in grid cells
-//  cell = px size of a grid cell (the "zoom illusion": bigger module -> bigger cells/units)
-//  stats are per single unit, stored in kW (power) and metres (footprint length)
-const SIZES = {
-  '1':   { label:'1MW',   w:2, cell:17,
-           capacity:1000, power:833,  mech:167, ups:500,  flen:6.7 },
-  '2.4': { label:'2.4MW', w:4, cell:21,
-           capacity:2400, power:2000, mech:400, ups:1200, flen:16  },
-  '5':   { label:'5MW',   w:6, cell:25,
-           capacity:5000, power:4170, mech:833, ups:2500, flen:33  },
+// Larger 56px cells so modules read at a good scale against the environment.
+// Grid is bottom-aligned to the ground plane; modules stack UPWARD (floors).
+const CELL = 56;
+const COLS = Math.floor(STAGE_W / CELL);   // 22
+const ROWS = 20;
+
+// A GPU Hall is powered only within this many adjacency hops of a Powercore.
+const POWER_MAX_DEPTH = 2;
+
+// ---- MODULE CATALOGUE -------------------------------------------------------
+// Type 1: Powercore — three sizes (w x 2 cells). Stats in kW / metres.
+const POWER = {
+  '1':   { label:'1MW',   w:2, h:2, capacity:1000, power:833,  mech:167, ups:500,  flen:6.7 },
+  '2.4': { label:'2.4MW', w:4, h:2, capacity:2400, power:2000, mech:400, ups:1200, flen:16  },
+  '5':   { label:'5MW',   w:6, h:2, capacity:5000, power:4170, mech:833, ups:2500, flen:33  },
+};
+// Type 2: GPU Hall — three tiers, all 4 x 3 cells (footprint identical).
+const GPU = {
+  'standard': { label:'Standard', w:4, h:3, racks:9,  gpuPerRack:72, model:'Nvidia H100',       cooling:'Rear Door HX',          powerDemand:500  },
+  'advanced': { label:'Advanced', w:4, h:3, racks:12, gpuPerRack:72, model:'Nvidia B200',       cooling:'Direct to Chip',        powerDemand:1000 },
+  'ai':       { label:'AI-Ready', w:4, h:3, racks:18, gpuPerRack:72, model:'Nvidia B300 Ultra', cooling:'Direct to Chip Liquid', powerDemand:2000 },
 };
 
-// The stat cards (top to bottom). Each pulls a per-unit field from SIZES.
-const STAT_DEFS = [
-  { key:'capacity', label:'Total Capacity',       fmt:fmtPower },
-  { key:'power',    label:'Power Infrastructure',  fmt:fmtPower },
-  { key:'mech',     label:'Mechanical Power',      fmt:fmtPower },
-  { key:'ups',      label:'UPS Capacity',          fmt:fmtPower },
-  { key:'flen',     label:'Footprint',             fmt:fmtFootprint },
-  { key:'units',    label:'Units Placed',          fmt:v => String(Math.round(v)) },
+// ---- STAT CARDS (single unified panel, fixed order) -------------------------
+const fmtInt       = v => String(Math.round(v));
+const fmtThousands = v => Math.round(v).toLocaleString('en-US');   // 6,480
+const GPU_FOOT = 16;   // each GPU Hall contributes 16m of footprint length
+
+const STATS = [
+  // 1. Total Capacity — sum of all Powercore MW
+  { key:'capacity', label:'Total Capacity', fmt:fmtPower, val:() => sumPower('capacity') },
+  // Power available vs. power consumed by powered GPU Halls
+  { key:'pavail',    label:'Power Available', fmt:fmtPower, val:() => sumPower('capacity') },
+  { key:'pconsumed', label:'Power Consumed',  fmt:fmtPower,
+    val:() => gpuUnits().filter(u => u.powered).reduce((a, u) => a + GPU[u.key].powerDemand, 0) },
+  // 2. GPU Capacity — headline: total GPUs + highest-tier model present
+  { key:'gpucap',   label:'GPU Capacity', headline:true, zeroDash:true,
+    fmt:fmtThousands,
+    val:() => gpuUnits().reduce((a,u) => a + GPU[u.key].racks * GPU[u.key].gpuPerRack, 0),
+    sub:() => highestGpuModel() },
+  // 3. Total Racks
+  { key:'racks', label:'Total Racks', fmt:v => fmtInt(v) + ' Racks', val:() => sumGpu('racks') },
+  // 4. Footprint — combined across ALL modules (Powercores + GPU Halls)
+  { key:'foot',  label:'Footprint', fmt:fmtFootprint, val:() => sumPower('flen') + gpuUnits().length * GPU_FOOT },
+  // 5/6. Powered / Unpowered GPU Halls
+  { key:'phalls', label:'Powered Halls',   fmt:fmtInt, val:() => gpuUnits().filter(u => u.powered).length },
+  { key:'uhalls', label:'Unpowered Halls', fmt:fmtInt, val:() => gpuUnits().filter(u => !u.powered).length },
 ];
+
+// Highest GPU tier model currently on the canvas (or null if none).
+function highestGpuModel() {
+  const order = ['standard', 'advanced', 'ai'];
+  let best = -1;
+  gpuUnits().forEach(u => { best = Math.max(best, order.indexOf(u.key)); });
+  return best >= 0 ? GPU[order[best]].model : null;
+}
 
 /* ================================================================
    STATE
    ================================================================ */
-let selectedSize = '2.4';     // default selection
-let units = [];               // { id, col, row, w, h, size, el }
+let units = [];               // { id, type, key, col, row, w, h, el, powered, depth }
 let occupied = {};            // "r,c" -> unit id
 let unitId = 0;
 let leadCaptured = false;     // has the lead form been submitted?
-let gateShown = false;        // has the 4-unit gate modal been auto-shown?
+let gateShown = false;        // has the lead gate auto-shown?
+let drag = null;              // active drag: { type, key, w, h, move? }
+let selectedUnit = null;      // currently selected (movable) module
+let delBtn = null;            // floating delete button for the selection
+let currentTab = 'power';     // active sidebar tab once in tab mode
 
 /* ================================================================
    DOM
@@ -567,34 +777,136 @@ let gateShown = false;        // has the 4-unit gate modal been auto-shown?
 const gridEl    = document.getElementById('grid');
 const ghostEl   = document.getElementById('ghost');
 const nudgeEl   = document.getElementById('nudge');
-const pickerEl  = document.getElementById('picker');
 const statsEl   = document.getElementById('stats');
 const bottomEl  = document.getElementById('bottomCount');
 const overlay   = document.getElementById('overlay');
+const envEl     = document.getElementById('env');
+const stageEl   = document.getElementById('stage');
+const flowEl    = document.getElementById('flow');
+const fctx      = flowEl.getContext('2d');
+
+/* ================================================================
+   BUILT-IN ENVIRONMENT — self-contained outdoor "yard" scene drawn as
+   an inline SVG (sky, clouds, tree line, fence, concrete wall, paved
+   floor with perspective tiles). The grid sits on the paved floor.
+   A real photo (assets/backdrop.jpg or "Set background") overrides it.
+   ================================================================ */
+function buildEnv() {
+  const HZ = 461;                         // horizon: pavement meets the grass band
+  // --- tree line: alternating conifers + rounded canopies along the horizon ---
+  let trees = '', x = -10, i = 0;
+  while (x < 1300) {
+    const baseY = HZ - 4;
+    if (i % 3 === 0) {                     // tall conifer (stacked triangles)
+      const h = 116 + (i % 2) * 34, w = 46, top = baseY - h, g = i % 2 ? '#2f7d3e' : '#378145';
+      trees += `<polygon points="${x},${baseY} ${x+w/2},${top} ${x+w},${baseY}" fill="${g}"/>`
+            +  `<polygon points="${x+5},${baseY-h*0.5} ${x+w/2},${top+h*0.2} ${x+w-5},${baseY-h*0.5}" fill="${g}" opacity=".85"/>`;
+      x += 40;
+    } else {                              // rounded broadleaf canopy
+      const r = 26 + (i % 3) * 7, cy = baseY - r * 0.8, g = i % 2 ? '#3c8a4a' : '#347e42';
+      trees += `<ellipse cx="${x+r}" cy="${cy}" rx="${r}" ry="${r*0.95}" fill="${g}"/>`;
+      x += 46;
+    }
+    i++;
+  }
+  // --- mesh fence just in front of the trees ---
+  let fence = '<rect x="0" y="446" width="1280" height="15" fill="rgba(205,210,214,.16)"/>';
+  for (let fx = 0; fx <= 1280; fx += 46) fence += `<line x1="${fx}" y1="446" x2="${fx}" y2="461" stroke="#aeb4b9" stroke-width="1.6"/>`;
+  fence += '<line x1="0" y1="447" x2="1280" y2="447" stroke="#c7ccd0" stroke-width="1.4"/>'
+        +  '<line x1="0" y1="459" x2="1280" y2="459" stroke="#c7ccd0" stroke-width="1.4"/>';
+  // --- paved floor: perspective tiles converging to a centre vanishing point ---
+  let floor = '';
+  for (let fx = -1280; fx <= 2560; fx += 150) floor += `<line x1="${fx}" y1="720" x2="640" y2="${HZ}" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`;
+  for (let k = 1; k <= 11; k++) { const t = k / 11, y = (HZ + (720 - HZ) * (t * t)).toFixed(1); floor += `<line x1="0" y1="${y}" x2="1280" y2="${y}" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`; }
+  // --- clouds ---
+  const cl = [[180,118,120,34],[520,86,150,40],[905,140,120,32],[1150,92,140,38],[700,176,92,26]];
+  let clouds = ''; cl.forEach(([cx,cy,rx,ry]) => clouds += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" filter="url(#cloud)" opacity=".92"/>`);
+
+  envEl.innerHTML =
+    `<svg class="env-grid" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid slice">
+       <defs>
+         <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5aa6e6"/><stop offset="1" stop-color="#d0eafa"/></linearGradient>
+         <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b414a"/><stop offset="1" stop-color="#292e34"/></linearGradient>
+         <linearGradient id="wallGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d3d7db"/><stop offset="1" stop-color="#b3b8be"/></linearGradient>
+         <filter id="cloud" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter>
+       </defs>
+       <rect x="0" y="0" width="1280" height="${HZ}" fill="url(#skyGrad)"/>
+       ${clouds}
+       <rect x="0" y="430" width="1280" height="34" fill="#4f7a3a"/>
+       ${trees}
+       ${fence}
+       <rect x="0" y="${HZ}" width="1280" height="${720-HZ}" fill="url(#floorGrad)"/>
+       ${floor}
+       <polygon points="0,140 445,300 445,600 0,690" fill="url(#wallGrad)"/>
+       <polygon points="0,140 445,300 445,309 0,150" fill="rgba(0,0,0,.12)"/>
+       <rect x="14" y="548" width="38" height="116" rx="2" fill="#e9ecef" stroke="#b9c0c6"/>
+     </svg>`;
+}
+
+/* ----- background-image upload (overrides the studio environment) ----- */
+const bgInput = document.getElementById('bgInput');
+document.getElementById('bgSet').addEventListener('click', () => bgInput.click());
+bgInput.addEventListener('change', () => {
+  const file = bgInput.files && bgInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    stageEl.style.backgroundImage    = `url(${e.target.result})`;
+    stageEl.style.backgroundSize     = 'cover';
+    stageEl.style.backgroundPosition = 'center';
+    envEl.style.display = 'none';                       // hide studio floor under the photo
+    document.getElementById('bgClear').style.display = 'inline';
+  };
+  reader.readAsDataURL(file);
+});
+document.getElementById('bgClear').addEventListener('click', e => {
+  e.preventDefault();
+  stageEl.style.backgroundImage = '';                   // restore the CSS gradient
+  stageEl.style.backgroundSize = '';
+  stageEl.style.backgroundPosition = '';
+  envEl.style.display = '';
+  document.getElementById('bgClear').style.display = 'none';
+  bgInput.value = '';
+});
+
+// Optional baked-in backdrop: if assets/backdrop.jpg ships with the file it
+// becomes the default environment; otherwise the drawn studio scene is kept.
+(function loadDefaultBackdrop() {
+  const img = new Image();
+  img.onload = () => {
+    stageEl.style.backgroundImage    = `url(${img.src})`;
+    stageEl.style.backgroundSize     = 'cover';
+    stageEl.style.backgroundPosition = 'center';
+    envEl.style.display = 'none';
+    document.getElementById('bgClear').style.display = 'inline';
+  };
+  img.src = 'assets/backdrop.jpg';
+})();
 
 /* ================================================================
    DURATA LOGO — recreated as inline SVG (13-fold circle rosette)
    Self-contained, crisp at any size, matches the brand mark.
    ================================================================ */
-function buildLogo() {
+// Reusable 13-fold circle rosette markup (unique gradient id per use).
+function durataLogoSVG(gid) {
   const N = 13, C = 100, r = 47;   // 13 circles, each passing through centre
   let circles = '';
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2;
-    const cx = (C + r * Math.cos(a)).toFixed(2);
-    const cy = (C + r * Math.sin(a)).toFixed(2);
-    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" />`;
+    circles += `<circle cx="${(C + r * Math.cos(a)).toFixed(2)}" cy="${(C + r * Math.sin(a)).toFixed(2)}" r="${r}" />`;
   }
-  document.getElementById('logo').innerHTML =
-    `<svg viewBox="0 0 200 200" fill="none">
+  return `<svg viewBox="0 0 200 200" fill="none">
        <defs>
-         <linearGradient id="durGrad" x1="0" y1="0" x2="0" y2="1">
+         <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
            <stop offset="0"   stop-color="#5DC0EE"/>
            <stop offset="1"   stop-color="#1A5A93"/>
          </linearGradient>
        </defs>
-       <g stroke="url(#durGrad)" stroke-width="2.4" opacity="0.95">${circles}</g>
+       <g stroke="url(#${gid})" stroke-width="2.4" opacity="0.95">${circles}</g>
      </svg>`;
+}
+function buildLogo() {
+  document.getElementById('logo').innerHTML = durataLogoSVG('durGrad');
 }
 
 /* ================================================================
@@ -607,63 +919,275 @@ function fmtPower(kw) {                   // kW -> "x kW" or "x MW"
   if (kw >= 1000) return trim(kw / 1000) + ' MW';
   return Math.round(kw) + ' kW';
 }
-function fmtFootprint(len) {              // total length -> "L×4×4m"
+function fmtFootprint(len) {              // total length -> "L × 4 × 4m"
   if (len <= 0) return '—';
-  return trim(len) + '×4×4m';
+  return trim(len) + ' × 4 × 4m';
 }
 
 /* ================================================================
-   SIZE PICKER
+   SIDEBAR CATALOGUE — Power / Compute tabs of draggable module cards
    ================================================================ */
-function buildPicker() {
-  pickerEl.innerHTML = '';
-  Object.keys(SIZES).forEach(key => {
-    const s = SIZES[key];
-    const opt = document.createElement('div');
-    opt.className = 'size-opt' + (key === selectedSize ? ' selected' : '');
-    opt.dataset.size = key;
-    // thumbnail width scales with module size for a quick visual cue
-    const tw = 24 + (s.w - 2) * 7;
-    opt.innerHTML =
+function buildCatalog() {
+  // Power tab — three Powercore sizes
+  const pp = document.getElementById('catPower');
+  Object.keys(POWER).forEach(key => {
+    const d = POWER[key];
+    const card = document.createElement('div');
+    card.className = 'mod-card'; card.draggable = true;
+    const tw = 24 + (d.w - 2) * 7;               // thumb width hints at size
+    card.innerHTML =
       `<div class="thumb" style="width:${tw}px"></div>
-       <div>
-         <div class="size-opt__label">${s.label}</div>
-         <div class="size-opt__sub">Powercore</div>
-       </div>`;
-    opt.addEventListener('click', () => selectSize(key));
-    pickerEl.appendChild(opt);
+       <div><div class="mod-card__label">${d.label}</div>
+            <div class="mod-card__sub">Powercore</div></div>`;
+    wireCard(card, 'power', key);
+    pp.appendChild(card);
   });
-  updatePickerLock();
+  // Compute tab — three GPU Hall tiers
+  const cp = document.getElementById('catCompute');
+  Object.keys(GPU).forEach(key => {
+    const d = GPU[key];
+    const card = document.createElement('div');
+    card.className = 'mod-card'; card.draggable = true;
+    card.innerHTML =
+      `<div class="thumb-gpu"></div>
+       <div><div class="mod-card__label">${d.label}</div>
+            <div class="mod-card__sub">${d.racks} racks · ${d.model}</div></div>`;
+    wireCard(card, 'gpu', key);
+    cp.appendChild(card);
+  });
+  // tab switching (only meaningful once tab mode is active)
+  document.querySelectorAll('.cat-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      currentTab = tab.dataset.cat;
+      updateSidebarMode();
+    });
+  });
+  updateSidebarMode();
 }
 
-function selectSize(key) {
-  if (units.length > 0) return;          // locked once a unit is on the canvas
-  selectedSize = key;
-  document.querySelectorAll('.size-opt').forEach(o =>
-    o.classList.toggle('selected', o.dataset.size === key));
-  buildGrid();                           // cell size (zoom) depends on module
-  updateStats(false);
-  updateBottomBar();
-}
+// Flat ALL view by default; the Power/Compute tab bar appears after 4 placements.
+function updateSidebarMode() {
+  const tabMode = units.length >= 4;
+  const power = currentTab === 'power';
+  document.getElementById('catTabs').style.display         = tabMode ? 'flex' : 'none';
+  document.getElementById('catPowerLabel').style.display   = tabMode ? 'none' : 'block';
+  document.getElementById('catComputeLabel').style.display = tabMode ? 'none' : 'block';
+  document.getElementById('catDivider').style.display      = tabMode ? 'none' : 'block';
 
-// Once units exist, grey out + lock the two non-selected options.
-function updatePickerLock() {
-  const locked = units.length > 0;
-  document.querySelectorAll('.size-opt').forEach(o => {
-    o.classList.toggle('locked', locked && o.dataset.size !== selectedSize);
-  });
+  // flat mode shows both groups; tab mode shows only the active category
+  document.getElementById('catPower').style.display   = (!tabMode || power) ? 'flex' : 'none';
+  document.getElementById('catCompute').style.display = (!tabMode || !power) ? 'flex' : 'none';
+
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === currentTab));
+  document.getElementById('catCaption').textContent = !tabMode
+    ? 'Drag any module onto the canvas'
+    : (power ? 'Drag a Powercore onto the canvas' : 'Drag a GPU Hall onto the canvas');
 }
 
 /* ================================================================
-   GRID
+   DRAG & DROP PLACEMENT (HTML5 drag-and-drop, IKEA-EKET style)
+   A card is dragged from the sidebar; a grid-snapped ghost follows the
+   cursor (cyan = valid, red = invalid); dropping places the module.
    ================================================================ */
-function cell() { return SIZES[selectedSize].cell; }
+// 1x1 transparent gif so the browser's default drag image is hidden and
+// only our grid-snapping ghost is visible while dragging.
+const blankImg = new Image();
+blankImg.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
+function wireCard(card, type, key) {
+  card.addEventListener('dragstart', e => {
+    const d = (type === 'power' ? POWER : GPU)[key];
+    drag = { type, key, w: d.w, h: d.h };
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', type + ':' + key);
+    try { e.dataTransfer.setDragImage(blankImg, 0, 0); } catch (_) {}
+    card.classList.add('dragging');
+  });
+  card.addEventListener('dragend', endDrag);
+}
+function endDrag() {
+  if (drag && drag.move) restoreUnit(drag.move);   // move cancelled (dropped off-grid)
+  drag = null;
+  ghostEl.style.display = 'none';
+  document.querySelectorAll('.mod-card.dragging').forEach(c => c.classList.remove('dragging'));
+}
+
+const clampN = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+// Grid cell (col,row) under a pointer event, using the grid's live rect.
+function cellFromEvent(e) {
+  const rect = gridEl.getBoundingClientRect();
+  return {
+    col: Math.floor((e.clientX - rect.left) / CELL),
+    row: Math.floor((e.clientY - rect.top)  / CELL),
+  };
+}
+
+/* ----- EKET feel: gravity snap, magnetic snap, nearest-valid ----- */
+
+// 2a — lowest valid (resting) row for a w×h footprint at column `col`:
+// scans up from the floor and returns the first row clear of overlaps, so the
+// module rests on the ground or on top of whatever is stacked beneath it.
+function gravityRow(col, w, h) {
+  for (let row = ROWS - h; row >= 0; row--) {
+    if (!overlaps(col, row, w, h)) return row;
+  }
+  return -1;   // column range full
+}
+
+// 2b — magnetic edge snap: if within 1.5 cells of an existing module's edge,
+// align the footprint exactly to that edge (returns adjusted {col,row}).
+function snapToEdge(col, row, w, h) {
+  const TH = 1.5;
+  let best = { col, row, rowSnapped: false }, bd = TH + 0.001;
+  units.forEach(u => {
+    const vOver = row < u.row + u.h && row + h > u.row;   // overlapping vertical span
+    const hOver = col < u.col + u.w && col + w > u.col;   // overlapping horizontal span
+    if (vOver) {                                          // snap left/right to u
+      let d = Math.abs(col - (u.col + u.w)); if (d < bd) { bd = d; best = { col: u.col + u.w, row, rowSnapped: false }; }
+      d = Math.abs((col + w) - u.col);       if (d < bd) { bd = d; best = { col: u.col - w, row, rowSnapped: false }; }
+    }
+    if (hOver) {                                          // snap top/bottom to u
+      let d = Math.abs(row - (u.row + u.h)); if (d < bd) { bd = d; best = { col, row: u.row + u.h, rowSnapped: true }; }
+      d = Math.abs((row + h) - u.row);       if (d < bd) { bd = d; best = { col, row: u.row - h, rowSnapped: true }; }
+    }
+  });
+  return best;
+}
+
+// 2d — nearest valid (no overlap, adjacent, on-grid) slot within 2 cells.
+function nearestValid(col, row, w, h) {
+  for (let r = 1; r <= 2; r++) {
+    let best = null, bd = 99;
+    for (let dr = -r; dr <= r; dr++) for (let dc = -r; dc <= r; dc++) {
+      if (Math.max(Math.abs(dr), Math.abs(dc)) !== r) continue;   // ring at radius r
+      const c = col + dc, rw = row + dr;
+      if (c < 0 || rw < 0 || c + w > COLS || rw + h > ROWS) continue;
+      if (overlaps(c, rw, w, h)) continue;
+      if (units.length > 0 && !isAdjacent(c, rw, w, h)) continue;
+      const d = Math.abs(dr) + Math.abs(dc);
+      if (d < bd) { bd = d; best = { col: c, row: rw }; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+// Resolve a raw cursor cell into the final snapped + settled + validated slot.
+function resolvePlacement(cx, cy, w, h) {
+  let col = clampN(cx, 0, COLS - w);
+  let row = clampN(cy, 0, ROWS - h);
+  const snap = snapToEdge(col, row, w, h);             // magnetic edge snap
+  col = clampN(snap.col, 0, COLS - w);
+  const cur = clampN(snap.row, 0, ROWS - h);
+
+  const g = gravityRow(col, w, h);                     // gravity: settle downward
+  if (snap.rowSnapped && !overlaps(col, cur, w, h)) row = cur;         // honour vertical snap
+  else if (g >= 0) { row = g; if (cur < g && !overlaps(col, cur, w, h)) row = cur; } // aim above stack
+  else row = cur;
+
+  let valid = row >= 0 && !overlaps(col, row, w, h) &&
+              (units.length === 0 || isAdjacent(col, row, w, h));
+  if (!valid) {                                        // snap to nearest valid slot
+    const near = nearestValid(col, row, w, h);
+    if (near) { col = near.col; row = near.row; valid = true; }
+  }
+  return { col, row, valid };
+}
+
+function showGhostAt(col, row, w, h, ok) {
+  ghostEl.style.display = 'block';
+  ghostEl.style.left   = (gridEl.offsetLeft + col * CELL) + 'px';
+  ghostEl.style.top    = (gridEl.offsetTop  + row * CELL) + 'px';
+  ghostEl.style.width  = (w * CELL) + 'px';
+  ghostEl.style.height = (h * CELL) + 'px';
+  ghostEl.classList.toggle('blocked', !ok);
+}
+
+// Dragging over the stage updates the snapped ghost; dropping places the module.
+stageEl.addEventListener('dragover', e => {
+  if (!drag) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = drag.move ? 'move' : 'copy';
+  const { col, row } = cellFromEvent(e);
+  const p = resolvePlacement(col, row, drag.w, drag.h);
+  showGhostAt(p.col, p.row, drag.w, drag.h, p.valid && (drag.move || canPlace()));
+});
+stageEl.addEventListener('drop', e => {
+  if (!drag) return;
+  e.preventDefault();
+  const moving = drag.move;
+  const { col, row } = cellFromEvent(e);
+  const p = resolvePlacement(col, row, drag.w, drag.h);
+  if (!moving && !canPlace()) { openLeadModal(); endDrag(); return; }   // lead gate
+  if (p.valid) {
+    if (moving) { moving.el.remove(); drag.move = null; }   // lifted already; drop the old el
+    placeUnit(drag.type, drag.key, p.col, p.row);
+  } else {
+    showAdjToast();
+    if (moving) { restoreUnit(moving); drag.move = null; }
+  }
+  endDrag();
+});
+stageEl.addEventListener('dragleave', e => { if (e.target === stageEl) ghostEl.style.display = 'none'; });
+
+/* ----- 2c — click to select, drag to reposition, × to delete ----- */
+gridEl.addEventListener('click', e => {
+  const { col, row } = cellFromEvent(e);
+  const hit = unitAt(col, row);
+  if (hit) selectUnit(hit); else deselectUnit();
+});
+
+function selectUnit(u) {
+  if (selectedUnit === u) return;
+  deselectUnit();
+  selectedUnit = u;
+  u.el.classList.add('selected');
+  delBtn = document.createElement('button');
+  delBtn.className = 'del-btn'; delBtn.textContent = '×'; delBtn.title = 'Remove';
+  delBtn.addEventListener('click', ev => { ev.stopPropagation(); const t = selectedUnit; deselectUnit(); removeUnit(t); });
+  stageEl.appendChild(delBtn);
+  positionDelBtn();
+}
+function deselectUnit() {
+  if (selectedUnit) selectedUnit.el.classList.remove('selected');
+  selectedUnit = null;
+  if (delBtn) { delBtn.remove(); delBtn = null; }
+}
+function positionDelBtn() {
+  if (!selectedUnit || !delBtn) return;
+  const u = selectedUnit;
+  delBtn.style.left = (gridEl.offsetLeft + (u.col + u.w) * CELL - 24) + 'px';
+  delBtn.style.top  = (gridEl.offsetTop  + u.row * CELL - 28) + 'px';
+}
+
+// Lift a unit out of occupancy so it can be dragged without blocking itself.
+function liftUnit(u) {
+  for (let r = u.row; r < u.row + u.h; r++)
+    for (let c = u.col; c < u.col + u.w; c++) delete occupied[r + ',' + c];
+  units = units.filter(x => x !== u);
+  u.el.style.opacity = '.3';
+}
+function restoreUnit(u) {     // put a lifted unit back if its move is cancelled
+  for (let r = u.row; r < u.row + u.h; r++)
+    for (let c = u.col; c < u.col + u.w; c++) occupied[r + ',' + c] = u.id;
+  units.push(u);
+  u.el.style.opacity = '';
+  recomputePower();
+}
+
+/* ================================================================
+   GRID — fixed 22x20 (56px cells), centred horizontally and bottom-aligned
+   to the ground plane. Cells above the ground extend upward (floors).
+   ================================================================ */
 function buildGrid() {
-  const c = cell();
-  gridEl.style.width  = (GRID * c) + 'px';
-  gridEl.style.height = (GRID * c) + 'px';
-  gridEl.style.backgroundSize = c + 'px ' + c + 'px';
+  const w = COLS * CELL, h = ROWS * CELL;
+  gridEl.style.width  = w + 'px';
+  gridEl.style.height = h + 'px';
+  gridEl.style.left   = Math.round((STAGE_W - w) / 2) + 'px';   // centred
+  gridEl.style.top    = (STAGE_H - h) + 'px';                   // bottom on the pavement
+  gridEl.style.backgroundSize = CELL + 'px ' + CELL + 'px';
+  sizeFlow();                                   // keep the flow canvas aligned
 }
 
 // Find the unit occupying a given cell, if any.
@@ -674,99 +1198,116 @@ function unitAt(col, row) {
 
 // Does a w×h footprint at (col,row) overlap anything / fall off-grid?
 function overlaps(col, row, w, h) {
-  if (col < 0 || row < 0 || col + w > GRID || row + h > GRID) return true;
+  if (col < 0 || row < 0 || col + w > COLS || row + h > ROWS) return true;
   for (let r = row; r < row + h; r++)
     for (let cc = col; cc < col + w; cc++)
       if (occupied[r + ',' + cc] != null) return true;
   return false;
 }
 
-// Can the user place another unit right now?
+// Can the user place another module right now? (lead gate at 4 total)
 function canPlace() {
   return leadCaptured || units.length < 4;
 }
 
-/* ----- click: place on empty cell, remove on a placed unit ----- */
-gridEl.addEventListener('click', e => {
-  const rect = gridEl.getBoundingClientRect();
-  const c = cell();
-  const col = Math.floor((e.clientX - rect.left) / c);
-  const row = Math.floor((e.clientY - rect.top)  / c);
-
-  const hit = unitAt(col, row);
-  if (hit) { removeUnit(hit); return; }
-
-  if (!canPlace()) { openLeadModal(); return; }   // gated -> prompt for details
-  tryPlace(col, row);
-});
-
-/* ----- hover ghost preview ----- */
-gridEl.addEventListener('mousemove', e => {
-  const rect = gridEl.getBoundingClientRect();
-  const c = cell();
-  let col = Math.floor((e.clientX - rect.left) / c);
-  let row = Math.floor((e.clientY - rect.top)  / c);
-  const w = SIZES[selectedSize].w, h = UNIT_H;
-  col = Math.min(Math.max(col, 0), GRID - w);
-  row = Math.min(Math.max(row, 0), GRID - h);
-
-  ghostEl.style.display = 'block';
-  ghostEl.style.left   = (gridEl.offsetLeft + col * c) + 'px';
-  ghostEl.style.top    = (gridEl.offsetTop  + row * c) + 'px';
-  ghostEl.style.width  = (w * c) + 'px';
-  ghostEl.style.height = (h * c) + 'px';
-  const blocked = overlaps(col, row, w, h) || !canPlace();
-  ghostEl.classList.toggle('blocked', blocked);
-});
-gridEl.addEventListener('mouseleave', () => { ghostEl.style.display = 'none'; });
-
-/* ----- place a unit ----- */
-function tryPlace(col, row) {
-  const w = SIZES[selectedSize].w, h = UNIT_H;
-  // clamp anchor so the footprint always fits inside the grid
-  col = Math.min(Math.max(col, 0), GRID - w);
-  row = Math.min(Math.max(row, 0), GRID - h);
-  if (overlaps(col, row, w, h)) return;            // occupied -> ignore
-  placeUnit(col, row);
+// Edge-adjacency: does any cell on the proposed footprint's perimeter (one
+// cell outward, sharing an edge — not diagonal) fall on an occupied cell?
+function isAdjacent(col, row, w, h) {
+  for (let r = row - 1; r <= row + h; r++) {
+    for (let c = col - 1; c <= col + w; c++) {
+      const horiz = (r >= row && r < row + h) && (c === col - 1 || c === col + w);
+      const vert  = (c >= col && c < col + w) && (r === row - 1 || r === row + h);
+      if (!(horiz || vert)) continue;          // skip interior + diagonal cells
+      if (occupied[r + ',' + c] != null) return true;
+    }
+  }
+  return false;
 }
 
-function placeUnit(col, row) {
-  const size = selectedSize;
-  const s = SIZES[size];
-  const w = s.w, h = UNIT_H, c = cell();
+// Brief red nudge when the adjacency rule blocks a placement.
+let adjTimer = null;
+function showAdjToast() {
+  const t = document.getElementById('adjToast');
+  t.style.display = 'block';
+  clearTimeout(adjTimer);
+  adjTimer = setTimeout(() => { t.style.display = 'none'; }, 1600);
+}
+
+// GPU Hall sprite: use gpu-hall.svg or gpu-hall.png if shipped alongside the
+// file, trying each in turn; if none load, the CSS fallback render is kept.
+const GPU_SPRITES = ['gpu-hall.svg', 'gpu-hall.png'];
+function attachGpuSprite(el) {
+  const img = document.createElement('img');
+  img.className = 'gpu-img'; img.alt = 'GPU Hall';
+  let i = 0;
+  img.onerror = () => { if (++i < GPU_SPRITES.length) img.src = GPU_SPRITES[i]; else img.remove(); };
+  img.src = GPU_SPRITES[0];
+  el.appendChild(img);
+}
+
+function placeUnit(type, key, col, row) {
+  const d = (type === 'power' ? POWER : GPU)[key];
+  const w = d.w, h = d.h, c = CELL;
   const id = ++unitId;
 
-  // build the unit element
+  // build the unit element (Powercore vs GPU Hall illustration)
   const el = document.createElement('div');
-  el.className = 'unit dropping';
+  el.className = 'unit dropping ' + (type === 'power' ? 'unit--power' : 'unit--gpu');
   el.style.left   = (col * c) + 'px';
   el.style.top    = (row * c) + 'px';
   el.style.width  = (w * c) + 'px';
   el.style.height = (h * c) + 'px';
-  el.style.setProperty('--seam', c + 'px');         // panel seam spacing tracks zoom
-  el.innerHTML =
-    '<div class="unit__roof"></div>' +
-    '<div class="unit__body"></div>' +
-    '<div class="unit__base"></div>';
+  el.style.setProperty('--seam', c + 'px');         // detail spacing tracks cell size
+  if (type === 'power') {
+    el.innerHTML =
+      '<div class="unit__roof"></div>' +
+      '<div class="unit__body"></div>' +
+      '<div class="unit__base"></div>';
+  } else {
+    // CSS fallback render; a sprite file (if present) overlays it on load
+    el.innerHTML =
+      '<div class="unit__gpu-body"></div>' +
+      '<div class="unit__gpu-led top"></div>' +
+      '<div class="unit__gpu-led bot"></div>' +
+      '<div class="unit__gpu-brand">' +
+        '<div class="unit__gpu-logo"></div>' +
+        '<div class="unit__gpu-wordmark">DURATA</div>' +
+      '</div>';
+    attachGpuSprite(el);
+  }
   gridEl.appendChild(el);
+  // Durata branding rosette on GPU Hall faces (unique gradient id per unit)
+  if (type === 'gpu') el.querySelector('.unit__gpu-logo').innerHTML = durataLogoSVG('durGrad' + id);
 
-  // record occupancy
+  // record occupancy + unit record
   for (let r = row; r < row + h; r++)
     for (let cc = col; cc < col + w; cc++)
       occupied[r + ',' + cc] = id;
-  units.push({ id, col, row, w, h, size, el });
+  const u = { id, type, key, col, row, w, h, el, powered: false, depth: Infinity };
+  units.push(u);
 
-  // land effects roughly when the bounce settles
-  setTimeout(() => {
-    playThud();
-    spawnDust(col, row, w, h, c);
-  }, 340);
+  // placed modules are draggable to reposition (2c)
+  el.draggable = true;
+  el.addEventListener('dragstart', e => {
+    e.stopPropagation();
+    deselectUnit();
+    drag = { type: u.type, key: u.key, w: u.w, h: u.h, move: u };
+    liftUnit(u);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'move');
+    try { e.dataTransfer.setDragImage(blankImg, 0, 0); } catch (_) {}
+  });
+  el.addEventListener('dragend', endDrag);
 
-  updatePickerLock();
+  // land effects roughly when the bounce settles (existing drop + dust + thud)
+  setTimeout(() => { playThud(); spawnDust(col, row, w, h, c); }, 340);
+
+  recomputePower();
   updateStats(true);
   updateBottomBar();
+  updateSidebarMode();
 
-  // lead gate: the moment the 4th unit lands, prompt before any more
+  // lead gate: prompt once the 4th module lands
   if (units.length === 4 && !leadCaptured && !gateShown) {
     gateShown = true;
     setTimeout(openLeadModal, 520);
@@ -774,19 +1315,125 @@ function placeUnit(col, row) {
 }
 
 function removeUnit(u) {
+  if (selectedUnit === u) deselectUnit();
   for (let r = u.row; r < u.row + u.h; r++)
     for (let cc = u.col; cc < u.col + u.w; cc++)
       delete occupied[r + ',' + cc];
   u.el.remove();
   units = units.filter(x => x.id !== u.id);
 
-  // dropping below the gate threshold lifts the soft gate's nudge
   if (units.length < 4) hideNudge();
   if (units.length === 0) gateShown = false;
 
-  updatePickerLock();
+  recomputePower();
   updateStats(true);
   updateBottomBar();
+  updateSidebarMode();
+}
+
+/* ================================================================
+   POWER PROPAGATION — BFS from every Powercore, max POWER_MAX_DEPTH hops.
+   Powercores are always powered (depth 0). A GPU Hall is powered if it
+   sits within POWER_MAX_DEPTH adjacency hops of a Powercore.
+   ================================================================ */
+// Ids of units sharing an edge with unit u (edge-adjacent, not diagonal).
+function adjacentUnitIds(u) {
+  const ids = new Set();
+  const check = (r, c) => { const id = occupied[r + ',' + c]; if (id != null && id !== u.id) ids.add(id); };
+  for (let c = u.col; c < u.col + u.w; c++) { check(u.row - 1, c); check(u.row + u.h, c); }  // top/bottom edges
+  for (let r = u.row; r < u.row + u.h; r++) { check(r, u.col - 1); check(r, u.col + u.w); }  // left/right edges
+  return ids;
+}
+
+function recomputePower() {
+  const byId = {};
+  units.forEach(u => { byId[u.id] = u; });
+
+  // reset: Powercores are powered at depth 0, GPU Halls start unpowered
+  units.forEach(u => { u.powered = (u.type === 'power'); u.depth = u.powered ? 0 : Infinity; });
+
+  // BFS outward from all Powercores at once, stopping at POWER_MAX_DEPTH hops
+  let frontier = units.filter(u => u.type === 'power');
+  let depth = 0;
+  while (frontier.length && depth < POWER_MAX_DEPTH) {
+    depth++;
+    const next = [];
+    frontier.forEach(u => {
+      adjacentUnitIds(u).forEach(id => {
+        const n = byId[id];
+        if (n && n.type === 'gpu' && !n.powered) {   // newly reached GPU Hall
+          n.powered = true; n.depth = depth; next.push(n);
+        }
+      });
+    });
+    frontier = next;
+  }
+
+  // apply visual powered/unpowered state, then rebuild the flow connections
+  units.forEach(u => {
+    if (u.type === 'gpu') {
+      u.el.classList.toggle('powered', u.powered);
+      u.el.classList.toggle('unpowered', !u.powered);
+    }
+  });
+  computeConnections();
+}
+
+/* ================================================================
+   POWER-FLOW ANIMATION — cyan particle streams along each supply edge,
+   drawn on a <canvas> overlay. Particles flow Powercore-outward (from a
+   lower BFS depth to the next), so chains all flow the same direction.
+   ================================================================ */
+const FLOW_SPEED = 60;       // px per second
+const FLOW_PARTICLES = 10;   // particles per connection
+let connections = [];        // [{ ax, ay, bx, by, len }] in grid-local px
+
+// Match the flow canvas to the grid's size + position.
+function sizeFlow() {
+  flowEl.width  = COLS * CELL;
+  flowEl.height = ROWS * CELL;
+  flowEl.style.left = gridEl.style.left;
+  flowEl.style.top  = gridEl.style.top;
+}
+const centerOf = u => ({ x: (u.col + u.w / 2) * CELL, y: (u.row + u.h / 2) * CELL });
+
+// A connection is drawn from a supplier (depth d) to a powered neighbour
+// at depth d+1 — i.e. Powercore -> hop-1 hall, hop-1 -> hop-2 hall.
+function computeConnections() {
+  const byId = {};
+  units.forEach(u => { byId[u.id] = u; });
+  const list = [];
+  units.forEach(u => {
+    if (u.type !== 'gpu' || !u.powered) return;
+    adjacentUnitIds(u).forEach(id => {
+      const s = byId[id];
+      if (s && s.powered && s.depth === u.depth - 1) {
+        const a = centerOf(s), b = centerOf(u);
+        list.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, len: Math.hypot(b.x - a.x, b.y - a.y) });
+      }
+    });
+  });
+  connections = list;
+}
+
+// Animation loop: clear + redraw the particle streams every frame.
+function flowLoop(ts) {
+  fctx.clearRect(0, 0, flowEl.width, flowEl.height);
+  const t = ts / 1000;
+  connections.forEach(cn => {
+    const period = (cn.len / FLOW_SPEED) || 1;          // seconds end-to-end
+    for (let k = 0; k < FLOW_PARTICLES; k++) {
+      const ph = ((t / period) + k / FLOW_PARTICLES) % 1; // 0..1 along the edge
+      const x = cn.ax + (cn.bx - cn.ax) * ph;
+      const y = cn.ay + (cn.by - cn.ay) * ph;
+      const a = 0.85 * Math.sin(Math.PI * ph);           // fade in/out at the ends
+      fctx.beginPath();
+      fctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      fctx.fillStyle = 'rgba(0,200,255,' + a.toFixed(3) + ')';
+      fctx.fill();
+    }
+  });
+  requestAnimationFrame(flowLoop);
 }
 
 /* ================================================================
@@ -795,7 +1442,7 @@ function removeUnit(u) {
 function spawnDust(col, row, w, h, c) {
   const baseX = gridEl.offsetLeft + (col + w / 2) * c;   // centre of the base
   const baseY = gridEl.offsetTop  + (row + h) * c;
-  const wrap  = document.getElementById('canvasWrap');
+  const wrap  = stageEl;
 
   for (let i = 0; i < 14; i++) {
     const p = document.createElement('div');
@@ -860,56 +1507,69 @@ function playThud() {
 }
 
 /* ================================================================
-   STATS PANEL (with count-up animation)
+   STATS PANEL — single unified, count-up panel (see STATS order).
    ================================================================ */
 const statState = {};   // key -> last displayed numeric value
 
+const powerUnits = () => units.filter(u => u.type === 'power');
+const gpuUnits   = () => units.filter(u => u.type === 'gpu');
+const sumPower = field => powerUnits().reduce((a, u) => a + POWER[u.key][field], 0);
+const sumGpu   = field => gpuUnits().reduce((a, u) => a + GPU[u.key][field], 0);
+
 function buildStats() {
   statsEl.innerHTML = '';
-  STAT_DEFS.forEach(def => {
+  STATS.forEach(def => {
     const card = document.createElement('div');
-    card.className = 'stat-card';
+    card.className = 'stat-card' + (def.headline ? ' headline' : '');
     card.id = 'stat-' + def.key;
-    card.innerHTML = `<div class="label">${def.label}</div><div class="value">&mdash;</div>`;
+    card.innerHTML = `<div class="label">${def.label}</div><div class="value">&mdash;</div>`
+                   + (def.headline ? '<div class="sub"></div>' : '');
     statsEl.appendChild(card);
     statState[def.key] = 0;
   });
 }
 
-function statTotal(def) {
-  const n = units.length;
-  if (def.key === 'units') return n;
-  return n * SIZES[selectedSize][def.key];     // all on-canvas units share one size
+// Per-def render: em-dash at zero for "zeroDash" stats, otherwise the formatter.
+function renderStat(def, v) {
+  return (def.zeroDash && Math.round(v) <= 0) ? '—' : def.fmt(v);
 }
 
 function updateStats(animate) {
-  STAT_DEFS.forEach(def => {
+  STATS.forEach(def => {
     const card = document.getElementById('stat-' + def.key);
     const valEl = card.querySelector('.value');
+    if (def.headline) card.querySelector('.sub').textContent = def.sub() || '';
+
     const from = statState[def.key];
-    const to   = statTotal(def);
+    const to   = def.val();
     statState[def.key] = to;
 
-    if (!animate) { valEl.textContent = to === 0 ? renderZero(def) : def.fmt(to); return; }
+    if (!animate) { valEl.textContent = renderStat(def, to); return; }
 
     card.classList.remove('is-bumped'); void card.offsetWidth; card.classList.add('is-bumped');
-    countUp(valEl, from, to, def);
+    countUp(valEl, from, to, v => renderStat(def, v));
   });
+  updatePowerWarning();
 }
 
-function renderZero(def) {
-  if (def.key === 'units') return '0';
-  if (def.key === 'flen')  return '—';
-  return '0 kW';
+// Visual warning on the Power Consumed card when demand exceeds capacity.
+function updatePowerWarning() {
+  const avail = sumPower('capacity');
+  const consumed = gpuUnits().filter(u => u.powered).reduce((a, u) => a + GPU[u.key].powerDemand, 0);
+  const card = document.getElementById('stat-pconsumed');
+  if (!card) return;
+  const over = consumed > avail;
+  card.style.borderColor = over ? 'rgba(255,90,90,0.6)' : '';
+  card.querySelector('.label').style.color = over ? '#ff8080' : '';
+  card.querySelector('.value').style.color = over ? '#ff8080' : 'var(--white)';
 }
 
-function countUp(el, from, to, def) {
+function countUp(el, from, to, render) {
   const dur = 480, start = performance.now();
   function frame(now) {
     const t = Math.min((now - start) / dur, 1);
     const eased = 1 - Math.pow(1 - t, 3);          // ease-out cubic
-    const v = from + (to - from) * eased;
-    el.textContent = (to === 0 && t >= 1) ? renderZero(def) : def.fmt(v);
+    el.textContent = render(from + (to - from) * eased);
     if (t < 1) requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -919,8 +1579,11 @@ function countUp(el, from, to, def) {
    BOTTOM BAR
    ================================================================ */
 function updateBottomBar() {
-  bottomEl.innerHTML =
-    `<span>${units.length}</span> &times; ${SIZES[selectedSize].label} Powercores configured`;
+  const count = (type, key) => units.filter(u => u.type === type && u.key === key).length;
+  const parts = [];
+  Object.keys(POWER).forEach(key => { const n = count('power', key); if (n) parts.push(`<span>${n}</span> &times; ${POWER[key].label} Powercore${n > 1 ? 's' : ''}`); });
+  Object.keys(GPU).forEach(key   => { const n = count('gpu',   key); if (n) parts.push(`<span>${n}</span> &times; ${GPU[key].label} GPU Hall${n > 1 ? 's' : ''}`); });
+  bottomEl.innerHTML = parts.length ? parts.join(' · ') + ' configured' : 'No modules configured';
 }
 
 /* ================================================================
@@ -967,11 +1630,14 @@ document.getElementById('submitBtn').addEventListener('click', () => {
    INIT
    ================================================================ */
 buildLogo();
-buildPicker();
+buildEnv();
+buildCatalog();
 buildGrid();
 buildStats();
 updateStats(false);
+recomputePower();          // empty canvas -> no connections yet
 updateBottomBar();
+requestAnimationFrame(flowLoop);   // start the power-flow animation loop
 </script>
 </body>
 </html>
