@@ -562,6 +562,32 @@
     cursor: pointer; z-index: 60; box-shadow: 0 2px 8px rgba(0,0,0,.5);
   }
   .del-btn:hover { filter: brightness(1.1); }
+
+  /* GPU Hall Durata branding (centred on the unit face) */
+  .unit__gpu-brand {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .unit__gpu-logo {
+    width: 28px;
+    height: 28px;
+    opacity: 0.85;
+  }
+  .unit__gpu-wordmark {
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.75);
+    text-transform: uppercase;
+  }
 </style>
 </head>
 <body>
@@ -693,9 +719,9 @@ const POWER = {
 };
 // Type 2: GPU Hall — three tiers, all 4 x 3 cells (footprint identical).
 const GPU = {
-  'standard': { label:'Standard', w:4, h:3, racks:9,  gpuPerRack:72, model:'Nvidia H100',       cooling:'Rear Door HX' },
-  'advanced': { label:'Advanced', w:4, h:3, racks:12, gpuPerRack:72, model:'Nvidia B200',       cooling:'Direct to Chip' },
-  'ai':       { label:'AI-Ready', w:4, h:3, racks:18, gpuPerRack:72, model:'Nvidia B300 Ultra', cooling:'Direct to Chip Liquid' },
+  'standard': { label:'Standard', w:4, h:3, racks:9,  gpuPerRack:72, model:'Nvidia H100',       cooling:'Rear Door HX',          powerDemand:500  },
+  'advanced': { label:'Advanced', w:4, h:3, racks:12, gpuPerRack:72, model:'Nvidia B200',       cooling:'Direct to Chip',        powerDemand:1000 },
+  'ai':       { label:'AI-Ready', w:4, h:3, racks:18, gpuPerRack:72, model:'Nvidia B300 Ultra', cooling:'Direct to Chip Liquid', powerDemand:2000 },
 };
 
 // ---- STAT CARDS (single unified panel, fixed order) -------------------------
@@ -706,6 +732,10 @@ const GPU_FOOT = 16;   // each GPU Hall contributes 16m of footprint length
 const STATS = [
   // 1. Total Capacity — sum of all Powercore MW
   { key:'capacity', label:'Total Capacity', fmt:fmtPower, val:() => sumPower('capacity') },
+  // Power available vs. power consumed by powered GPU Halls
+  { key:'pavail',    label:'Power Available', fmt:fmtPower, val:() => sumPower('capacity') },
+  { key:'pconsumed', label:'Power Consumed',  fmt:fmtPower,
+    val:() => gpuUnits().filter(u => u.powered).reduce((a, u) => a + GPU[u.key].powerDemand, 0) },
   // 2. GPU Capacity — headline: total GPUs + highest-tier model present
   { key:'gpucap',   label:'GPU Capacity', headline:true, zeroDash:true,
     fmt:fmtThousands,
@@ -857,25 +887,26 @@ document.getElementById('bgClear').addEventListener('click', e => {
    DURATA LOGO — recreated as inline SVG (13-fold circle rosette)
    Self-contained, crisp at any size, matches the brand mark.
    ================================================================ */
-function buildLogo() {
+// Reusable 13-fold circle rosette markup (unique gradient id per use).
+function durataLogoSVG(gid) {
   const N = 13, C = 100, r = 47;   // 13 circles, each passing through centre
   let circles = '';
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2;
-    const cx = (C + r * Math.cos(a)).toFixed(2);
-    const cy = (C + r * Math.sin(a)).toFixed(2);
-    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" />`;
+    circles += `<circle cx="${(C + r * Math.cos(a)).toFixed(2)}" cy="${(C + r * Math.sin(a)).toFixed(2)}" r="${r}" />`;
   }
-  document.getElementById('logo').innerHTML =
-    `<svg viewBox="0 0 200 200" fill="none">
+  return `<svg viewBox="0 0 200 200" fill="none">
        <defs>
-         <linearGradient id="durGrad" x1="0" y1="0" x2="0" y2="1">
+         <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
            <stop offset="0"   stop-color="#5DC0EE"/>
            <stop offset="1"   stop-color="#1A5A93"/>
          </linearGradient>
        </defs>
-       <g stroke="url(#durGrad)" stroke-width="2.4" opacity="0.95">${circles}</g>
+       <g stroke="url(#${gid})" stroke-width="2.4" opacity="0.95">${circles}</g>
      </svg>`;
+}
+function buildLogo() {
+  document.getElementById('logo').innerHTML = durataLogoSVG('durGrad');
 }
 
 /* ================================================================
@@ -1174,9 +1205,9 @@ function overlaps(col, row, w, h) {
   return false;
 }
 
-// Can the user place another module right now? (lead gate at 6 total)
+// Can the user place another module right now? (lead gate at 4 total)
 function canPlace() {
-  return leadCaptured || units.length < 6;
+  return leadCaptured || units.length < 4;
 }
 
 // Edge-adjacency: does any cell on the proposed footprint's perimeter (one
@@ -1237,10 +1268,16 @@ function placeUnit(type, key, col, row) {
     el.innerHTML =
       '<div class="unit__gpu-body"></div>' +
       '<div class="unit__gpu-led top"></div>' +
-      '<div class="unit__gpu-led bot"></div>';
+      '<div class="unit__gpu-led bot"></div>' +
+      '<div class="unit__gpu-brand">' +
+        '<div class="unit__gpu-logo"></div>' +
+        '<div class="unit__gpu-wordmark">DURATA</div>' +
+      '</div>';
     attachGpuSprite(el);
   }
   gridEl.appendChild(el);
+  // Durata branding rosette on GPU Hall faces (unique gradient id per unit)
+  if (type === 'gpu') el.querySelector('.unit__gpu-logo').innerHTML = durataLogoSVG('durGrad' + id);
 
   // record occupancy + unit record
   for (let r = row; r < row + h; r++)
@@ -1270,8 +1307,8 @@ function placeUnit(type, key, col, row) {
   updateBottomBar();
   updateSidebarMode();
 
-  // lead gate: prompt once the 6th module lands
-  if (units.length === 6 && !leadCaptured && !gateShown) {
+  // lead gate: prompt once the 4th module lands
+  if (units.length === 4 && !leadCaptured && !gateShown) {
     gateShown = true;
     setTimeout(openLeadModal, 520);
   }
@@ -1285,7 +1322,7 @@ function removeUnit(u) {
   u.el.remove();
   units = units.filter(x => x.id !== u.id);
 
-  if (units.length < 6) hideNudge();
+  if (units.length < 4) hideNudge();
   if (units.length === 0) gateShown = false;
 
   recomputePower();
@@ -1512,6 +1549,19 @@ function updateStats(animate) {
     card.classList.remove('is-bumped'); void card.offsetWidth; card.classList.add('is-bumped');
     countUp(valEl, from, to, v => renderStat(def, v));
   });
+  updatePowerWarning();
+}
+
+// Visual warning on the Power Consumed card when demand exceeds capacity.
+function updatePowerWarning() {
+  const avail = sumPower('capacity');
+  const consumed = gpuUnits().filter(u => u.powered).reduce((a, u) => a + GPU[u.key].powerDemand, 0);
+  const card = document.getElementById('stat-pconsumed');
+  if (!card) return;
+  const over = consumed > avail;
+  card.style.borderColor = over ? 'rgba(255,90,90,0.6)' : '';
+  card.querySelector('.label').style.color = over ? '#ff8080' : '';
+  card.querySelector('.value').style.color = over ? '#ff8080' : 'var(--white)';
 }
 
 function countUp(el, from, to, render) {
@@ -1547,7 +1597,7 @@ function openLeadModal() {
 function closeLeadModal() {
   overlay.classList.remove('open');
   // soft gate: dismissed without capturing AND already at the threshold
-  if (!leadCaptured && units.length >= 6) showNudge();
+  if (!leadCaptured && units.length >= 4) showNudge();
 }
 function showNudge() { nudgeEl.style.display = 'block'; }
 function hideNudge() { nudgeEl.style.display = 'none'; }
